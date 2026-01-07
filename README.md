@@ -636,7 +636,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 👨‍💻 Author
 
 **Veloso**
-- GitHub: [@yourusername](https://github.com/yourusername)
+- GitHub: [@kiumaveloso](https://github.com/kiumaveloso)
 
 ---
 
