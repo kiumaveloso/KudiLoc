@@ -1,0 +1,15 @@
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/bin/Debug/net8.0/ATMLocator.Application.deps.json
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/bin/Debug/net8.0/ATMLocator.Application.dll
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/bin/Debug/net8.0/ATMLocator.Application.pdb
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/bin/Debug/net8.0/ATMLocator.Core.dll
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/bin/Debug/net8.0/ATMLocator.Core.pdb
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/ATMLocator.Application.csproj.AssemblyReference.cache
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/ATMLocator.Application.GeneratedMSBuildEditorConfig.editorconfig
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/ATMLocator.Application.AssemblyInfoInputs.cache
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/ATMLocator.Application.AssemblyInfo.cs
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/ATMLocator.Application.csproj.CoreCompileInputs.cache
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/ATMLocat.ECBA850A.Up2Date
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/ATMLocator.Application.dll
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/refint/ATMLocator.Application.dll
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/ATMLocator.Application.pdb
+/Users/kiumaveloso/RiderProjects/KudivilaATMLocator/ATMLocator.Application/obj/Debug/net8.0/ref/ATMLocator.Application.dll

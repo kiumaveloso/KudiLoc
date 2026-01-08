@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "CNSZei2FRK6iH3YpCV9Vkerphgx2krFJ1UfLlDF1/G8=",
+  "Source": "ATMLocator.API",
+  "BasePath": "_content/ATMLocator.API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
