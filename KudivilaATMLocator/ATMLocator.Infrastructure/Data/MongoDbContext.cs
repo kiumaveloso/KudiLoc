@@ -1,6 +1,7 @@
 using ATMLocator.Core.Entities;
 using ATMLocator.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 
 namespace ATMLocator.Infrastructure.Data;
@@ -9,6 +10,21 @@ public class MongoDbContext
 {
     private readonly IMongoDatabase _database;
     private readonly MongoDbSettings _settings;
+
+    static MongoDbContext()
+    {
+        // Register BSON class map so GeoJsonPoint serializes with lowercase
+        // field names required by MongoDB 2dsphere indexes.
+        if (!BsonClassMap.IsClassMapRegistered(typeof(GeoJsonPoint)))
+        {
+            BsonClassMap.RegisterClassMap<GeoJsonPoint>(cm =>
+            {
+                cm.AutoMap();
+                cm.MapMember(p => p.Type).SetElementName("type");
+                cm.MapMember(p => p.Coordinates).SetElementName("coordinates");
+            });
+        }
+    }
 
     public MongoDbContext(IOptions<MongoDbSettings> settings)
     {
@@ -41,6 +57,11 @@ public class MongoDbContext
             .Descending(atm => atm.CurrentStatus.HasCash)
             .Descending(atm => atm.CurrentStatus.ReliabilityScore);
         ATMs.Indexes.CreateOne(new CreateIndexModel<ATM>(atmStatusIndex));
+
+        // 2dsphere index on the GeoJSON Location field for geospatial queries
+        var atmLocationIndex = Builders<ATM>.IndexKeys
+            .Geo2DSphere(atm => atm.Location);
+        ATMs.Indexes.CreateOne(new CreateIndexModel<ATM>(atmLocationIndex));
 
         // Index for status reports by ATM
         var reportAtmIndex = Builders<StatusReport>.IndexKeys

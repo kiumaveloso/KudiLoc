@@ -16,10 +16,10 @@ public class CreateATMDtoValidator : AbstractValidator<CreateATMDto>
             .MaximumLength(100).WithMessage("Nome do banco não pode ter mais de 100 caracteres");
 
         RuleFor(x => x.Latitude)
-            .InclusiveBetween(-90, 90).WithMessage("Latitude inválida");
+            .InclusiveBetween(-18.0, -4.4).WithMessage("Latitude deve estar dentro dos limites de Angola (-18.0 a -4.4)");
 
         RuleFor(x => x.Longitude)
-            .InclusiveBetween(-180, 180).WithMessage("Longitude inválida");
+            .InclusiveBetween(11.7, 24.1).WithMessage("Longitude deve estar dentro dos limites de Angola (11.7 a 24.1)");
 
         RuleFor(x => x.Province)
             .NotEmpty().WithMessage("Província é obrigatória")

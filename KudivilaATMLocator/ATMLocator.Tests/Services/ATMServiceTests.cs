@@ -4,7 +4,9 @@ using FluentAssertions;
 using ATMLocator.Application.Services;
 using ATMLocator.Core.Interfaces;
 using ATMLocator.Core.Entities;
+using ATMLocator.Core.Settings;
 using ATMLocator.Application.DTOs;
+using Microsoft.Extensions.Options;
 
 namespace ATMLocator.Tests;
 
@@ -16,7 +18,8 @@ public class ATMServiceTests
     public ATMServiceTests()
     {
         _mockRepo = new Mock<IATMRepository>();
-        _service = new ATMService(_mockRepo.Object);
+        var settings = Options.Create(new ATMSettings());
+        _service = new ATMService(_mockRepo.Object, settings);
     }
 
     private ATM CreateTestATM(string id, string name, bool hasCash, int reliabilityScore)
@@ -186,14 +189,16 @@ public class ATMServiceTests
             CreateTestATM("2", "BAI Kilamba", true, 75)
         };
 
-        _mockRepo.Setup(r => r.SearchAsync("BFA")).ReturnsAsync(new List<ATM> { testATMs[0] });
+        _mockRepo.Setup(r => r.SearchAsync("BFA", It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync(new List<ATM> { testATMs[0] });
+        _mockRepo.Setup(r => r.CountSearchAsync("BFA")).ReturnsAsync(1);
 
         // Act
         var result = await _service.SearchATMsAsync("BFA");
 
         // Assert
-        result.Should().HaveCount(1);
-        result[0].Name.Should().Contain("BFA");
+        result.Items.Should().HaveCount(1);
+        result.Items[0].Name.Should().Contain("BFA");
     }
 
     [Fact]
@@ -206,13 +211,15 @@ public class ATMServiceTests
             CreateTestATM("2", "ATM Luanda 2", true, 75)
         };
 
-        _mockRepo.Setup(r => r.GetByProvinceAsync("Luanda")).ReturnsAsync(testATMs);
+        _mockRepo.Setup(r => r.GetByProvinceAsync("Luanda", It.IsAny<int>(), It.IsAny<int>()))
+            .ReturnsAsync(testATMs);
+        _mockRepo.Setup(r => r.CountByProvinceAsync("Luanda")).ReturnsAsync(2);
 
         // Act
         var result = await _service.GetATMsByProvinceAsync("Luanda");
 
         // Assert
-        result.Should().HaveCount(2);
-        result.Should().AllSatisfy(atm => atm.Location.Province.Should().Be("Luanda"));
+        result.Items.Should().HaveCount(2);
+        result.Items.Should().AllSatisfy(atm => atm.Location.Province.Should().Be("Luanda"));
     }
 }

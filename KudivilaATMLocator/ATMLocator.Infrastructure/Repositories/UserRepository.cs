@@ -44,7 +44,18 @@ public class UserRepository : IUserRepository
             u => u.Id == user.Id,
             user
         );
-        
+
         return user;
+    }
+
+    public async Task<long> CountAllAsync()
+    {
+        return await _context.Users.CountDocumentsAsync(_ => true);
+    }
+
+    public async Task<bool> DeleteAsync(string id)
+    {
+        var result = await _context.Users.DeleteOneAsync(user => user.Id == id);
+        return result.DeletedCount > 0;
     }
 }

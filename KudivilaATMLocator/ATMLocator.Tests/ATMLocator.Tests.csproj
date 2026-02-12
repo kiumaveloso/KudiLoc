@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ATMLocator.API\ATMLocator.API.csproj" />
     <ProjectReference Include="..\ATMLocator.Application\ATMLocator.Application.csproj" />
     <ProjectReference Include="..\ATMLocator.Core\ATMLocator.Core.csproj" />
     <ProjectReference Include="..\ATMLocator.Infrastructure\ATMLocator.Infrastructure.csproj" />

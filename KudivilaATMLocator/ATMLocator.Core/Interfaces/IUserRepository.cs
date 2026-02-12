@@ -8,4 +8,6 @@ public interface IUserRepository
     Task<User?> GetByPhoneNumberAsync(string phoneNumber);
     Task<User> CreateAsync(User user);
     Task<User> UpdateAsync(User user);
+    Task<long> CountAllAsync();
+    Task<bool> DeleteAsync(string id);
 }

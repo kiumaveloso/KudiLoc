@@ -1,10 +1,14 @@
 using ATMLocator.Application.DTOs;
 using ATMLocator.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace ATMLocator.API.Controllers;
 
+[ApiVersion("1.0")]
 [ApiController]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Route("api/[controller]")]
 public class StatusReportController : ControllerBase
 {
@@ -22,6 +26,7 @@ public class StatusReportController : ControllerBase
     /// <summary>
     /// Submit a status report for an ATM (crowd-sourcing)
     /// </summary>
+    [Authorize]
     [HttpPost]
     public async Task<ActionResult<StatusReportResponseDto>> SubmitReport(
         [FromBody] CreateStatusReportDto dto)
@@ -42,7 +47,7 @@ public class StatusReportController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error submitting report");
-            return StatusCode(500, "Erro ao submeter relatório");
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao submeter relatório" });
         }
     }
 
@@ -50,17 +55,20 @@ public class StatusReportController : ControllerBase
     /// Get recent reports for an ATM
     /// </summary>
     [HttpGet("atm/{atmId}")]
-    public async Task<ActionResult<List<StatusReportResponseDto>>> GetRecentReports(string atmId)
+    public async Task<ActionResult> GetRecentReports(
+        string atmId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         try
         {
-            var reports = await _reportService.GetRecentReportsAsync(atmId);
-            return Ok(reports);
+            var result = await _reportService.GetRecentReportsAsync(atmId, page, pageSize);
+            return Ok(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting reports for ATM: {AtmId}", atmId);
-            return StatusCode(500, "Erro ao buscar relatórios");
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao buscar relatórios" });
         }
     }
 }

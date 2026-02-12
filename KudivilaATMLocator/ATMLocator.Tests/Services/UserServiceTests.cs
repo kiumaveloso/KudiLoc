@@ -4,7 +4,7 @@ using FluentAssertions;
 using ATMLocator.Application.Services;
 using ATMLocator.Core.Interfaces;
 using ATMLocator.Core.Entities;
-using ATMLocator.Application.DTOs;
+using CreateUserDto = ATMLocator.Application.DTOs.CreateUserDto;
 
 namespace ATMLocator.Tests;
 
@@ -22,7 +22,6 @@ public class UserServiceTests
     [Fact]
     public async Task CreateUser_WithValidData_CreatesUser()
     {
-        // Arrange
         _mockRepo.Setup(r => r.GetByPhoneNumberAsync(It.IsAny<string>()))
             .ReturnsAsync((User?)null);
         
@@ -35,21 +34,18 @@ public class UserServiceTests
 
         var dto = new CreateUserDto("+244923456789", "João Silva");
 
-        // Act
         var result = await _service.CreateUserAsync(dto);
 
-        // Assert
         result.Should().NotBeNull();
         result.PhoneNumber.Should().Be("+244923456789");
         result.Name.Should().Be("João Silva");
-        result.ReputationScore.Should().Be(50); // Default
+        result.ReputationScore.Should().Be(50);
         _mockRepo.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Once);
     }
 
     [Fact]
     public async Task CreateUser_WhenUserExists_ThrowsInvalidOperationException()
     {
-        // Arrange
         var existingUser = new User
         {
             Id = "existing",
@@ -65,7 +61,6 @@ public class UserServiceTests
 
         var dto = new CreateUserDto("+244923456789", "João Silva");
 
-        // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await _service.CreateUserAsync(dto)
         );
@@ -74,7 +69,6 @@ public class UserServiceTests
     [Fact]
     public async Task GetUserByPhoneNumber_WhenExists_ReturnsUser()
     {
-        // Arrange
         var user = new User
         {
             Id = "user123",
@@ -89,10 +83,8 @@ public class UserServiceTests
         _mockRepo.Setup(r => r.GetByPhoneNumberAsync("+244923456789"))
             .ReturnsAsync(user);
 
-        // Act
         var result = await _service.GetUserByPhoneNumberAsync("+244923456789");
 
-        // Assert
         result.Should().NotBeNull();
         result!.PhoneNumber.Should().Be("+244923456789");
         result.ReputationScore.Should().Be(85);
@@ -101,21 +93,17 @@ public class UserServiceTests
     [Fact]
     public async Task GetUserByPhoneNumber_WhenNotExists_ReturnsNull()
     {
-        // Arrange
         _mockRepo.Setup(r => r.GetByPhoneNumberAsync(It.IsAny<string>()))
             .ReturnsAsync((User?)null);
 
-        // Act
         var result = await _service.GetUserByPhoneNumberAsync("+244999999999");
 
-        // Assert
         result.Should().BeNull();
     }
 
     [Fact]
     public async Task GetUserById_WhenExists_ReturnsUser()
     {
-        // Arrange
         var user = new User
         {
             Id = "user123",
@@ -129,11 +117,9 @@ public class UserServiceTests
 
         _mockRepo.Setup(r => r.GetByIdAsync("user123")).ReturnsAsync(user);
 
-        // Act
         var result = await _service.GetUserByIdAsync("user123");
 
-        // Assert
         result.Should().NotBeNull();
         result!.Id.Should().Be("user123");
     }
-} 
+}

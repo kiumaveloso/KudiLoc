@@ -1,10 +1,15 @@
 using ATMLocator.Application.DTOs;
 using ATMLocator.Application.Services;
+using ATMLocator.Core.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Asp.Versioning;
 
 namespace ATMLocator.API.Controllers;
 
+[ApiVersion("1.0")]
 [ApiController]
+[Route("api/v{version:apiVersion}/[controller]")]
 [Route("api/[controller]")]
 public class UserController : ControllerBase
 {
@@ -17,33 +22,9 @@ public class UserController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// Register a new user
-    /// </summary>
-    [HttpPost("register")]
-    public async Task<ActionResult<UserDto>> RegisterUser([FromBody] CreateUserDto dto)
-    {
-        try
-        {
-            var user = await _userService.CreateUserAsync(dto);
-            return CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error registering user");
-            return StatusCode(500, "Erro ao registar utilizador");
-        }
-    }
-
-    /// <summary>
-    /// Get user by ID
-    /// </summary>
+    [Authorize]
     [HttpGet("{id}")]
-    public async Task<ActionResult<UserDto>> GetUserById(string id)
+    public async Task<ActionResult<User>> GetUserById(string id)
     {
         try
         {
@@ -51,23 +32,20 @@ public class UserController : ControllerBase
             
             if (user == null)
             {
-                return NotFound("Utilizador não encontrado");
+                return NotFound(new { statusCode = 404, message = "Utilizador não encontrado" });
             }
-
             return Ok(user);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting user by ID: {Id}", id);
-            return StatusCode(500, "Erro ao buscar utilizador");
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao buscar utilizador" });
         }
     }
 
-    /// <summary>
-    /// Get user by phone number
-    /// </summary>
+    [Authorize]
     [HttpGet("phone/{phoneNumber}")]
-    public async Task<ActionResult<UserDto>> GetUserByPhoneNumber(string phoneNumber)
+    public async Task<ActionResult<User>> GetUserByPhoneNumber(string phoneNumber)
     {
         try
         {
@@ -75,15 +53,54 @@ public class UserController : ControllerBase
             
             if (user == null)
             {
-                return NotFound("Utilizador não encontrado");
+                return NotFound(new { statusCode = 404, message = "Utilizador não encontrado" });
             }
-
             return Ok(user);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting user by phone: {Phone}", phoneNumber);
-            return StatusCode(500, "Erro ao buscar utilizador");
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao buscar utilizador" });
+        }
+    }
+
+    [Authorize]
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> DeleteUser(string id)
+    {
+        try
+        {
+            var deleted = await _userService.DeleteUserAsync(id);
+            if (!deleted)
+            {
+                return NotFound(new { statusCode = 404, message = "Utilizador não encontrado" });
+            }
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting user: {Id}", id);
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao eliminar utilizador" });
+        }
+    }
+
+    [Authorize]
+    [HttpPut("{id}")]
+    public async Task<ActionResult<User>> UpdateUser(string id, [FromBody] UpdateUserDto dto)
+    {
+        try
+        {
+            var user = await _userService.UpdateUserAsync(id, dto);
+            return Ok(user);
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user: {Id}", id);
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao atualizar utilizador" });
         }
     }
 }

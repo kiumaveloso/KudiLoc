@@ -8,6 +8,11 @@ public class ErrorHandlingMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<ErrorHandlingMiddleware> _logger;
 
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
     public ErrorHandlingMiddleware(RequestDelegate next, ILogger<ErrorHandlingMiddleware> logger)
     {
         _next = next;
@@ -29,35 +34,18 @@ public class ErrorHandlingMiddleware
 
     private static Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
-        var code = HttpStatusCode.InternalServerError;
-        var result = string.Empty;
-
-        switch (exception)
+        var (code, message) = exception switch
         {
-            case ArgumentException:
-            case InvalidOperationException:
-                code = HttpStatusCode.BadRequest;
-                result = JsonSerializer.Serialize(new 
-                { 
-                    error = exception.Message 
-                });
-                break;
-            
-            case KeyNotFoundException:
-                code = HttpStatusCode.NotFound;
-                result = JsonSerializer.Serialize(new 
-                { 
-                    error = "Recurso não encontrado" 
-                });
-                break;
-            
-            default:
-                result = JsonSerializer.Serialize(new 
-                { 
-                    error = "Ocorreu um erro interno no servidor" 
-                });
-                break;
-        }
+            ArgumentException ex => (HttpStatusCode.BadRequest, ex.Message),
+            InvalidOperationException ex => (HttpStatusCode.BadRequest, ex.Message),
+            UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "Acesso não autorizado"),
+            KeyNotFoundException => (HttpStatusCode.NotFound, "Recurso não encontrado"),
+            _ => (HttpStatusCode.InternalServerError, "Ocorreu um erro interno no servidor")
+        };
+
+        var result = JsonSerializer.Serialize(
+            new { statusCode = (int)code, message },
+            JsonOptions);
 
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)code;

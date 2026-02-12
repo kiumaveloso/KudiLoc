@@ -1,27 +1,117 @@
+using System.Text;
+using AspNetCoreRateLimit;
 using ATMLocator.Application.Services;
+using Serilog;
 using ATMLocator.Application.Validators;
 using ATMLocator.Core.Interfaces;
+using ATMLocator.Core.Settings;
 using ATMLocator.Infrastructure.Configuration;
 using ATMLocator.Infrastructure.Data;
 using ATMLocator.Infrastructure.Repositories;
 using ATMLocator.API.Middleware;
-using ATMLocator.API.Services; 
+using ATMLocator.API.Services;
 using ATMLocator.API.HealthChecks;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
+using Asp.Versioning;
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.File("logs/kudiloc-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 30,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog();
+
+// Limit request body to 10MB globally (prevents abuse)
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10 MB
+});
 
 // Add services to the container
+builder.Services.AddResponseCaching();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(
+        ["application/json", "text/json"]);
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+    options.Level = CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+    options.Level = CompressionLevel.SmallestSize);
 builder.Services.AddControllers();
+
+// API Versioning
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = new UrlSegmentApiVersionReader();
+});
 
 // Add FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateATMDtoValidator>();
 
+// Configure IP Rate Limiting
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(
+    builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.AddInMemoryRateLimiting();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+
+// Configure JWT Settings
+var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
+    ?? throw new InvalidOperationException("JWT settings are not configured in appsettings.json");
+builder.Services.AddSingleton(jwtSettings);
+
+// Register AuthService (scoped - depends on scoped IUserRepository) and OTP Service (singleton - in-memory store)
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddSingleton<IOtpService, OtpService>();
+
+// Configure JWT Authentication
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings.Issuer,
+        ValidAudience = jwtSettings.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(jwtSettings.Key)),
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
 builder.Services.AddEndpointsApiExplorer();
 
-// Enhanced Swagger configuration
+// Enhanced Swagger configuration with JWT support
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new()
@@ -35,50 +125,82 @@ builder.Services.AddSwaggerGen(c =>
             Email = "support@kudivila.ao"
         }
     });
+
+    // Add JWT Bearer authentication to Swagger
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Insira o token JWT. Exemplo: eyJhbGciOiJIUzI1NiIs..."
+    });
+
+    c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+    });
 });
+
+// Configure ATM and Report settings
+builder.Services.Configure<ATMSettings>(
+    builder.Configuration.GetSection("ATMSettings"));
+builder.Services.Configure<ReportSettings>(
+    builder.Configuration.GetSection("ReportSettings"));
 
 // Configure MongoDB
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection("MongoDbSettings"));
 
-// Register MongoDB Context
+// Register MongoDB Context as Singleton (MongoDB driver is thread-safe)
 builder.Services.AddSingleton<MongoDbContext>();
 
-// Register Repositories
+// Repositories and services as Scoped (one instance per request)
 builder.Services.AddScoped<IATMRepository, ATMRepository>();
 builder.Services.AddScoped<IStatusReportRepository, StatusReportRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-
-// Register Services
 builder.Services.AddScoped<IATMService, ATMService>();
 builder.Services.AddScoped<IStatusReportService, StatusReportService>();
 builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IPhotoService, PhotoService>();
-
-// Enable static files for serving photos
-builder.Services.AddDirectoryBrowser();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddSingleton<IPhotoService, PhotoService>();
 
 // Add Health Checks
 builder.Services.AddHealthChecks()
     .AddCheck<MongoDbHealthCheck>("mongodb");
 
 // Configure CORS
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("KudiLocPolicy", policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        if (allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
+        else
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
     });
 });
 
-// Configure Logging
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-builder.Logging.AddDebug();
+// Serilog is configured above via builder.Host.UseSerilog()
 
 var app = builder.Build();
+
+// Seed development data (only in Development, only if DB is empty)
+if (app.Environment.IsDevelopment())
+{
+    var dbContext = app.Services.GetRequiredService<MongoDbContext>();
+    await DevDataSeeder.SeedAsync(dbContext);
+}
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
@@ -88,7 +210,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Kudivila ATM Locator API v1");
-        c.RoutePrefix = string.Empty; // Swagger at root
+        c.RoutePrefix = "swagger";
         c.DocumentTitle = "Kudivila API Documentation";
     });
 }
@@ -97,20 +219,40 @@ else
     app.UseHsts();
 }
 
+// Correlation ID for request tracing (reads or generates X-Correlation-Id)
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// Response compression (gzip/brotli) - must be early before anything writes the body
+app.UseResponseCompression();
+
+// Security headers on all responses
+app.UseMiddleware<SecurityHeadersMiddleware>();
+
+// IP Rate Limiting runs early in the pipeline (before auth)
+app.UseIpRateLimiting();
+
+// Serilog request logging (method, path, status code, duration)
+app.UseSerilogRequestLogging();
+
 // Add custom middleware
-app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+app.UseCors("KudiLocPolicy");
+app.UseResponseCaching();
 
 // Add health check endpoint
 app.MapHealthChecks("/health");
 
+app.UseAuthentication();
 app.UseAuthorization();
+
+// Serve static files (photos) before controllers so /photos/* is served directly
+app.UseStaticFiles();
+
 app.MapControllers();
 
-// Add a root endpoint for quick status check
+// Root endpoint for quick status check
 app.MapGet("/", () => new
 {
     service = "Kudivila ATM Locator API",
@@ -119,7 +261,7 @@ app.MapGet("/", () => new
     timestamp = DateTime.UtcNow
 });
 
-// Serve static files (photos)
-app.UseStaticFiles();
+app.Run();
 
-app.Run(); 
+// Make Program accessible for integration tests via WebApplicationFactory
+public partial class Program { }
