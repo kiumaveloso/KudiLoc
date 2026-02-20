@@ -1,27 +1,45 @@
 using ATMLocator.Core.Entities;
+using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace ATMLocator.Infrastructure.Data;
 
 public static class DevDataSeeder
 {
-    public static async Task SeedAsync(MongoDbContext context)
+    /// <summary>
+    /// Seeds development sample data into MongoDB.
+    /// This method is resilient to MongoDB being unavailable -- it logs a
+    /// warning and returns gracefully so that the application can still start.
+    /// </summary>
+    public static async Task SeedAsync(MongoDbContext context, ILogger? logger = null)
     {
-        // Only seed if the ATMs collection is empty
-        var existingCount = await context.ATMs.CountDocumentsAsync(FilterDefinition<ATM>.Empty);
-        if (existingCount > 0)
-            return;
-
-        var now = DateTime.UtcNow;
-        var atms = GetSampleATMs(now);
-        await context.ATMs.InsertManyAsync(atms);
-
-        var users = GetSampleUsers(now);
-        foreach (var user in users)
+        try
         {
-            // Use upsert to avoid duplicate key errors on phone number
-            var filter = Builders<User>.Filter.Eq(u => u.PhoneNumber, user.PhoneNumber);
-            await context.Users.ReplaceOneAsync(filter, user, new ReplaceOptions { IsUpsert = true });
+            // Only seed if the ATMs collection is empty
+            var existingCount = await context.ATMs.CountDocumentsAsync(FilterDefinition<ATM>.Empty);
+            if (existingCount > 0)
+                return;
+
+            var now = DateTime.UtcNow;
+            var atms = GetSampleATMs(now);
+            await context.ATMs.InsertManyAsync(atms);
+
+            var users = GetSampleUsers(now);
+            foreach (var user in users)
+            {
+                // Use upsert to avoid duplicate key errors on phone number
+                var filter = Builders<User>.Filter.Eq(u => u.PhoneNumber, user.PhoneNumber);
+                await context.Users.ReplaceOneAsync(filter, user, new ReplaceOptions { IsUpsert = true });
+            }
+
+            logger?.LogInformation("Development seed data inserted successfully");
+        }
+        catch (Exception ex) when (ex is MongoConnectionException or TimeoutException or MongoCommandException or MongoBulkWriteException or MongoWriteException)
+        {
+            logger?.LogWarning(ex,
+                "Failed to seed development data — MongoDB may be unavailable. " +
+                "The application will continue without seed data");
         }
     }
 
@@ -131,6 +149,7 @@ public static class DevDataSeeder
     {
         var atm = new ATM
         {
+            Id = ObjectId.GenerateNewId().ToString(),
             Name = name,
             BankName = bankName,
             Latitude = lat,
@@ -168,6 +187,7 @@ public static class DevDataSeeder
         [
             new User
             {
+                Id = ObjectId.GenerateNewId().ToString(),
                 PhoneNumber = "+244923000001",
                 Name = "Utilizador Demo",
                 ReputationScore = 100,
@@ -177,6 +197,7 @@ public static class DevDataSeeder
             },
             new User
             {
+                Id = ObjectId.GenerateNewId().ToString(),
                 PhoneNumber = "+244912000002",
                 Name = "Maria Silva",
                 ReputationScore = 75,

@@ -1,5 +1,6 @@
 using ATMLocator.Core.Entities;
 using ATMLocator.Infrastructure.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
@@ -10,6 +11,8 @@ public class MongoDbContext
 {
     private readonly IMongoDatabase _database;
     private readonly MongoDbSettings _settings;
+    private readonly ILogger<MongoDbContext>? _logger;
+    private volatile bool _indexesCreated;
 
     static MongoDbContext()
     {
@@ -26,55 +29,79 @@ public class MongoDbContext
         }
     }
 
-    public MongoDbContext(IOptions<MongoDbSettings> settings)
+    public MongoDbContext(IOptions<MongoDbSettings> settings, ILogger<MongoDbContext>? logger = null)
     {
         _settings = settings.Value;
-        
-        var client = new MongoClient(_settings.ConnectionString);
+        _logger = logger;
+
+        // Parse the configured connection string and apply a shorter server
+        // selection timeout so that startup does not hang for the default 30s
+        // when MongoDB is unreachable.
+        var mongoUrl = new MongoUrl(_settings.ConnectionString);
+        var clientSettings = MongoClientSettings.FromUrl(mongoUrl);
+        clientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
+        clientSettings.ConnectTimeout = TimeSpan.FromSeconds(5);
+
+        var client = new MongoClient(clientSettings);
         _database = client.GetDatabase(_settings.DatabaseName);
-        
-        CreateIndexes();
     }
 
-    public IMongoCollection<ATM> ATMs => 
+    public IMongoCollection<ATM> ATMs =>
         _database.GetCollection<ATM>(_settings.ATMsCollectionName);
 
-    public IMongoCollection<StatusReport> StatusReports => 
+    public IMongoCollection<StatusReport> StatusReports =>
         _database.GetCollection<StatusReport>(_settings.StatusReportsCollectionName);
 
-    public IMongoCollection<User> Users => 
+    public IMongoCollection<User> Users =>
         _database.GetCollection<User>(_settings.UsersCollectionName);
 
-    private void CreateIndexes()
+    /// <summary>
+    /// Creates required MongoDB indexes. Called during application startup
+    /// rather than in the constructor to avoid blocking DI resolution when
+    /// MongoDB is unreachable.
+    /// </summary>
+    public async Task EnsureIndexesCreatedAsync()
     {
-        // Index for province filtering
-        var atmProvinceIndex = Builders<ATM>.IndexKeys
-            .Ascending(atm => atm.Province);
-        ATMs.Indexes.CreateOne(new CreateIndexModel<ATM>(atmProvinceIndex));
+        if (_indexesCreated) return;
 
-        // Index for ATM status queries
-        var atmStatusIndex = Builders<ATM>.IndexKeys
-            .Descending(atm => atm.CurrentStatus.HasCash)
-            .Descending(atm => atm.CurrentStatus.ReliabilityScore);
-        ATMs.Indexes.CreateOne(new CreateIndexModel<ATM>(atmStatusIndex));
+        try
+        {
+            // Index for province filtering
+            var atmProvinceIndex = Builders<ATM>.IndexKeys
+                .Ascending(atm => atm.Province);
+            await ATMs.Indexes.CreateOneAsync(new CreateIndexModel<ATM>(atmProvinceIndex));
 
-        // 2dsphere index on the GeoJSON Location field for geospatial queries
-        var atmLocationIndex = Builders<ATM>.IndexKeys
-            .Geo2DSphere(atm => atm.Location);
-        ATMs.Indexes.CreateOne(new CreateIndexModel<ATM>(atmLocationIndex));
+            // Index for ATM status queries
+            var atmStatusIndex = Builders<ATM>.IndexKeys
+                .Descending(atm => atm.CurrentStatus.HasCash)
+                .Descending(atm => atm.CurrentStatus.ReliabilityScore);
+            await ATMs.Indexes.CreateOneAsync(new CreateIndexModel<ATM>(atmStatusIndex));
 
-        // Index for status reports by ATM
-        var reportAtmIndex = Builders<StatusReport>.IndexKeys
-            .Ascending(report => report.ATMId)
-            .Descending(report => report.ReportedAt);
-        StatusReports.Indexes.CreateOne(new CreateIndexModel<StatusReport>(reportAtmIndex));
+            // 2dsphere index on the GeoJSON Location field for geospatial queries
+            var atmLocationIndex = Builders<ATM>.IndexKeys
+                .Geo2DSphere(atm => atm.Location);
+            await ATMs.Indexes.CreateOneAsync(new CreateIndexModel<ATM>(atmLocationIndex));
 
-        // Index for user phone numbers (unique)
-        var userPhoneIndex = Builders<User>.IndexKeys
-            .Ascending(user => user.PhoneNumber);
-        Users.Indexes.CreateOne(new CreateIndexModel<User>(
-            userPhoneIndex,
-            new CreateIndexOptions { Unique = true }
-        ));
+            // Index for status reports by ATM
+            var reportAtmIndex = Builders<StatusReport>.IndexKeys
+                .Ascending(report => report.ATMId)
+                .Descending(report => report.ReportedAt);
+            await StatusReports.Indexes.CreateOneAsync(new CreateIndexModel<StatusReport>(reportAtmIndex));
+
+            // Index for user phone numbers (unique)
+            var userPhoneIndex = Builders<User>.IndexKeys
+                .Ascending(user => user.PhoneNumber);
+            await Users.Indexes.CreateOneAsync(new CreateIndexModel<User>(
+                userPhoneIndex,
+                new CreateIndexOptions { Unique = true }
+            ));
+
+            _indexesCreated = true;
+            _logger?.LogInformation("MongoDB indexes created successfully");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Failed to create MongoDB indexes. They will be retried on next startup");
+        }
     }
 }

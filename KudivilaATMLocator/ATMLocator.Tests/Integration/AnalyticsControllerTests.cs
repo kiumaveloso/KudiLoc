@@ -86,6 +86,9 @@ public class AnalyticsControllerTests : IClassFixture<CustomWebApplicationFactor
         _factory.MockStatusReportRepository
             .Setup(r => r.GetRecentReportsAsync("atm-activity", It.IsAny<TimeSpan>()))
             .ReturnsAsync(new List<StatusReport>());
+        _factory.MockStatusReportRepository
+            .Setup(r => r.CountByATMIdAsync("atm-activity"))
+            .ReturnsAsync(0);
 
         // Act
         var response = await _client.GetAsync("/api/Analytics/atm/atm-activity/activity");

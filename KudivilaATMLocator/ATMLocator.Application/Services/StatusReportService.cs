@@ -79,10 +79,10 @@ public class StatusReportService : IStatusReportService
 
         var createdReport = await _reportRepository.CreateAsync(report);
 
-        // 4. Update ATM status based on crowd-sourced data
+        // 5. Update ATM status based on crowd-sourced data
         await UpdateATMStatusAsync(atm);
 
-        // 5. Update user reputation
+        // 6. Update user reputation
         await UpdateUserReputationAsync(user, createdReport);
 
         return MapToDto(createdReport);

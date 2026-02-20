@@ -195,11 +195,32 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Seed development data (only in Development, only if DB is empty)
-if (app.Environment.IsDevelopment())
+// Create MongoDB indexes and seed data (skipped when MongoDbContext is not registered, e.g. in tests).
+// Both operations are non-fatal: if MongoDB is unavailable the app will still start and
+// serve requests. Endpoints that require the DB will return appropriate errors at call time.
 {
-    var dbContext = app.Services.GetRequiredService<MongoDbContext>();
-    await DevDataSeeder.SeedAsync(dbContext);
+    var dbContext = app.Services.GetService<MongoDbContext>();
+    if (dbContext != null)
+    {
+        try
+        {
+            await dbContext.EnsureIndexesCreatedAsync();
+
+            // Seed development data (only in Development, only if DB is empty)
+            if (app.Environment.IsDevelopment())
+            {
+                var seederLogger = app.Services.GetService<ILoggerFactory>()?.CreateLogger("DevDataSeeder");
+                await DevDataSeeder.SeedAsync(dbContext, seederLogger);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex,
+                "MongoDB is not available during startup. Index creation and data seeding were skipped. " +
+                "The application will continue, but database-dependent endpoints will fail until MongoDB is reachable. " +
+                "Start MongoDB and restart the application, or ensure the connection string in appsettings.json is correct");
+        }
+    }
 }
 
 // Configure the HTTP request pipeline
