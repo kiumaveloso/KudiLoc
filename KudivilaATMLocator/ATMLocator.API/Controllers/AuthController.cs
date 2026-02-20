@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using ATMLocator.Application.DTOs;
 using ATMLocator.Application.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -14,12 +15,14 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IOtpService _otpService;
+    private readonly IUserService _userService;
     private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IAuthService authService, IOtpService otpService, ILogger<AuthController> logger)
+    public AuthController(IAuthService authService, IOtpService otpService, IUserService userService, ILogger<AuthController> logger)
     {
         _authService = authService;
         _otpService = otpService;
+        _userService = userService;
         _logger = logger;
     }
 
@@ -102,5 +105,36 @@ public class AuthController : ControllerBase
             var result = await _authService.RegisterAsync(dto.PhoneNumber, null);
             return Ok(result);
         }
+    }
+
+    /// <summary>
+    /// Get the current authenticated user's profile
+    /// </summary>
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<IActionResult> GetCurrentUser()
+    {
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new { statusCode = 401, message = "Token inválido" });
+        }
+
+        var user = await _userService.GetUserByIdAsync(userId);
+        if (user == null)
+        {
+            return NotFound(new { statusCode = 404, message = "Utilizador não encontrado" });
+        }
+
+        return Ok(new
+        {
+            user.Id,
+            user.PhoneNumber,
+            user.Name,
+            user.ReputationScore,
+            user.TotalReports,
+            user.AccurateReports,
+            user.CreatedAt
+        });
     }
 }

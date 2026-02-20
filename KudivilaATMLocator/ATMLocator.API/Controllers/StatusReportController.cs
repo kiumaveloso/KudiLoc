@@ -42,7 +42,11 @@ public class StatusReportController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest(new { statusCode = 400, message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(429, new { statusCode = 429, message = ex.Message });
         }
         catch (Exception ex)
         {

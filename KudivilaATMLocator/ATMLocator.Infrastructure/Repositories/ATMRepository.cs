@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ATMLocator.Core.Entities;
 using ATMLocator.Core.Interfaces;
 using ATMLocator.Infrastructure.Data;
@@ -97,11 +98,12 @@ public class ATMRepository : IATMRepository
 
     private static FilterDefinition<ATM> BuildSearchFilter(string searchTerm)
     {
+        var escaped = Regex.Escape(searchTerm);
         return Builders<ATM>.Filter.Or(
-            Builders<ATM>.Filter.Regex(atm => atm.Name, new MongoDB.Bson.BsonRegularExpression(searchTerm, "i")),
-            Builders<ATM>.Filter.Regex(atm => atm.BankName, new MongoDB.Bson.BsonRegularExpression(searchTerm, "i")),
-            Builders<ATM>.Filter.Regex(atm => atm.Address.Neighborhood, new MongoDB.Bson.BsonRegularExpression(searchTerm, "i")),
-            Builders<ATM>.Filter.Regex(atm => atm.Address.Landmark, new MongoDB.Bson.BsonRegularExpression(searchTerm, "i"))
+            Builders<ATM>.Filter.Regex(atm => atm.Name, new MongoDB.Bson.BsonRegularExpression(escaped, "i")),
+            Builders<ATM>.Filter.Regex(atm => atm.BankName, new MongoDB.Bson.BsonRegularExpression(escaped, "i")),
+            Builders<ATM>.Filter.Regex(atm => atm.Address.Neighborhood, new MongoDB.Bson.BsonRegularExpression(escaped, "i")),
+            Builders<ATM>.Filter.Regex(atm => atm.Address.Landmark, new MongoDB.Bson.BsonRegularExpression(escaped, "i"))
         );
     }
 
