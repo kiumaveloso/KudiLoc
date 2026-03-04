@@ -231,11 +231,10 @@ if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
 }
-else
-{
-    app.UseHsts();
-    app.UseHttpsRedirection();
-}
+
+// HTTPS redirection is intentionally skipped — Render (and most cloud platforms) handle
+// TLS termination at the edge. The app receives plain HTTP internally, so redirecting
+// to HTTPS would break health checks and internal routing.
 
 // Swagger is always available -- this is a free/open API and frontend devs need the docs
 app.UseSwagger();
