@@ -171,20 +171,23 @@ builder.Services.AddHealthChecks()
     .AddCheck<MongoDbHealthCheck>("mongodb");
 
 // Configure CORS
+// In Development: allow any origin so frontend devs can connect from any host.
+// In Production: restrict to the configured allowed origins list.
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+var isDevelopment = builder.Environment.IsDevelopment();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("KudiLocPolicy", policy =>
     {
-        if (allowedOrigins.Length > 0)
+        if (isDevelopment || allowedOrigins.Length == 0)
         {
-            policy.WithOrigins(allowedOrigins)
+            policy.AllowAnyOrigin()
                   .AllowAnyMethod()
                   .AllowAnyHeader();
         }
         else
         {
-            policy.AllowAnyOrigin()
+            policy.WithOrigins(allowedOrigins)
                   .AllowAnyMethod()
                   .AllowAnyHeader();
         }
@@ -227,18 +230,27 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Kudivila ATM Locator API v1");
-        c.RoutePrefix = "swagger";
-        c.DocumentTitle = "Kudivila API Documentation";
-    });
 }
 else
 {
     app.UseHsts();
+    app.UseHttpsRedirection();
 }
+
+// Swagger is always available -- this is a free/open API and frontend devs need the docs
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Kudivila ATM Locator API v1");
+    c.RoutePrefix = "swagger";
+    c.DocumentTitle = "Kudivila API Documentation";
+});
+
+// Routing must be explicit so CORS can run after it (required in ASP.NET Core 6+)
+app.UseRouting();
+
+// CORS must come after UseRouting so endpoints are matched before CORS headers are applied
+app.UseCors("KudiLocPolicy");
 
 // Correlation ID for request tracing (reads or generates X-Correlation-Id)
 app.UseMiddleware<CorrelationIdMiddleware>();
@@ -257,9 +269,6 @@ app.UseSerilogRequestLogging();
 
 // Add custom middleware
 app.UseMiddleware<ErrorHandlingMiddleware>();
-
-app.UseHttpsRedirection();
-app.UseCors("KudiLocPolicy");
 app.UseResponseCaching();
 
 // Add health check endpoint

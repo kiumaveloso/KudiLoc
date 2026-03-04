@@ -1,6 +1,5 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
-EXPOSE 8080
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
@@ -18,7 +17,10 @@ RUN dotnet restore
 # Copy everything and build
 COPY . .
 RUN dotnet build -c Release --no-restore
-RUN dotnet test -c Release --no-build --no-restore
+
+# Tests are skipped in Docker builds because they require a live MongoDB instance.
+# Run tests locally or in CI before building the image:
+#   dotnet test -c Release --no-build --no-restore
 
 FROM build AS publish
 RUN dotnet publish ATMLocator.API/ATMLocator.API.csproj -c Release -o /app/publish --no-build
@@ -36,7 +38,10 @@ RUN mkdir -p logs wwwroot/photos && chown -R appuser:appuser /app
 
 USER appuser
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+# Render.com injects PORT env var. ASP.NET Core reads ASPNETCORE_URLS to determine
+# which address/port to bind. The entrypoint script maps PORT -> ASPNETCORE_URLS.
+# If PORT is not set (e.g., local Docker run), default to 8080.
+ENV ASPNETCORE_ENVIRONMENT=Production
 
-ENTRYPOINT ["dotnet", "ATMLocator.API.dll"]
+# Use a shell entrypoint so we can expand $PORT at runtime
+ENTRYPOINT ["sh", "-c", "dotnet ATMLocator.API.dll --urls http://0.0.0.0:${PORT:-8080}"]

@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: kudiloc-api
+    runtime: docker
+    dockerfilePath: ./KudivilaATMLocator/Dockerfile
+    dockerContext: ./KudivilaATMLocator
+    region: frankfurt  # Closest Render region to Angola
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: MongoDbSettings__ConnectionString
+        sync: false  # Must be set manually in Render dashboard (MongoDB Atlas connection string)
+      - key: MongoDbSettings__DatabaseName
+        value: KudiLoc
+      - key: Jwt__Key
+        generateValue: true  # Render auto-generates a random secret
+      - key: Jwt__Issuer
+        value: KudiLoc
+      - key: Jwt__Audience
+        value: KudiLoc
+      - key: Jwt__ExpirationDays
+        value: "7"
