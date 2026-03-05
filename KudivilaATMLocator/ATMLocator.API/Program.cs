@@ -270,17 +270,10 @@ app.UseSerilogRequestLogging();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseResponseCaching();
 
-// Add health check endpoint — always return 200 so Render's health check passes.
-// MongoDB being unreachable returns degraded, not a crash.
-app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
-{
-    ResultStatusCodes =
-    {
-        [Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Healthy] = 200,
-        [Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded] = 200,
-        [Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy] = 200
-    }
-});
+// Simple instant health check — returns 200 immediately so Render's health check
+// never times out. MongoDB connectivity is checked separately via /health/db.
+app.MapGet("/health", () => Results.Ok("Healthy"));
+app.MapHealthChecks("/health/db");
 
 app.UseAuthentication();
 app.UseAuthorization();
