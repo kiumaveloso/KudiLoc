@@ -31,6 +31,11 @@ WORKDIR /app
 # Create non-root user
 RUN adduser --disabled-password --gecos "" appuser
 
+# Fix OpenSSL 3.x compatibility with MongoDB Atlas TLS on Debian Bookworm.
+# Without this, the SSL handshake fails with "tlsv1 alert internal error".
+RUN sed -i 's/\(MinProtocol *= *\).*/\1TLSv1.2/' /etc/ssl/openssl.cnf \
+    && sed -i 's/\(CipherString *= *\).*/\1DEFAULT:@SECLEVEL=1/' /etc/ssl/openssl.cnf
+
 COPY --from=publish /app/publish .
 
 # Create directories for logs and photos with proper permissions
