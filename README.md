@@ -1,682 +1,389 @@
-# KudiLoc
-# Kudivila ATM Locator API
+# KudiLoc — ATM Locator for Angola
 
 **A crowd-sourced ATM cash availability platform for Angola**
 
-> Solving Angola's ATM cash availability crisis through intelligent crowd-sourcing and community-driven reporting.
+> Solving Angola's ATM cash availability crisis through community-driven reporting and intelligent crowd-sourcing.
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [The Problem](#the-problem)
-- [The Solution](#the-solution)
-- [Key Features](#key-features)
 - [Architecture](#architecture)
 - [Technology Stack](#technology-stack)
-- [Getting Started](#getting-started)
-- [API Documentation](#api-documentation)
-- [Crowd-Sourcing Algorithm](#crowd-sourcing-algorithm)
-- [Testing](#testing)
-- [Deployment](#deployment)
 - [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [API Reference](#api-reference)
+- [Crowd-Sourcing Algorithm](#crowd-sourcing-algorithm)
+- [Frontend](#frontend)
+- [Deployment](#deployment)
+- [Testing](#testing)
 - [Contributing](#contributing)
-- [License](#license)
 
 ---
 
-## 🌍 Overview
+## Overview
 
-Kudivila is a RESTful API that enables users to find ATMs with available cash in Angola. Built with .NET 8 and MongoDB, it uses an intelligent crowd-sourcing algorithm that weights reports based on user reputation to provide reliable, real-time ATM status information.
+KudiLoc is a full-stack platform with a **.NET C# REST API** backend and a **React web frontend**. Users can find ATMs with available cash, report ATM status in real-time, and help the community avoid wasted trips.
+
+The system uses a reputation-weighted crowd-sourcing algorithm to determine ATM reliability and cash availability.
 
 ---
 
-## 🚨 The Problem
+## The Problem
 
 Angola faces a persistent ATM cash availability crisis:
 
 - **2.3 ATMs** visited on average before finding cash
-- **45 minutes** average time wasted
-- **500-1500 Kz** transport costs per failed attempt
+- **45 minutes** average time wasted per trip
+- **500–1500 Kz** in transport costs per failed attempt
 - **No real-time information** about ATM status
 
-This affects **34+ million people** across Angola, with particularly acute challenges in urban areas like Luanda.
+This affects **34+ million people** across Angola.
 
 ---
 
-## ✅ The Solution
+## Architecture
 
-Kudivila implements a **community-driven intelligence system** where:
+Clean Architecture with four layers:
 
-1. 👥 Users report ATM cash availability in real-time
-2. 🧮 Algorithm weights reports based on user reputation (0-100)
-3. 📊 System calculates reliability scores for each ATM
-4. ✅ Users see trustworthy status before traveling
-
-**Result**: 85% reduction in failed ATM visits, saving users time and money.
-
----
-
-## ⚡ Key Features
-
-### Core Functionality
-- 🗺️ **Geospatial Search**: Find ATMs within specified radius using Haversine distance calculation
-- 📍 **Real-time Status**: Live cash availability based on recent community reports
-- ⭐ **Reliability Scoring**: 0-100 score indicating report confidence level
-- 🏆 **Reputation System**: User credibility tracking (rewards accuracy, penalizes false reports)
-- 🔍 **Advanced Search**: Filter by province, bank, neighborhood, or landmark
-- 📸 **Photo Upload**: Community-submitted ATM photos
-- 📊 **Analytics Dashboard**: System statistics and ATM activity tracking
-
-### Technical Features
-- 🔐 **JWT Authentication**: Secure token-based auth with 30-day expiry
-- ✅ **Input Validation**: FluentValidation for request validation
-- 🛡️ **Global Error Handling**: Consistent error responses across all endpoints
-- 📝 **Request Logging**: Comprehensive request/response logging
-- 🏥 **Health Checks**: MongoDB connectivity monitoring
-- 🚀 **High Performance**: Response caching and database indexing
-- 📖 **API Documentation**: Interactive Swagger UI
-
----
-
-## 🏗️ Architecture
-
-Kudivila follows **Clean Architecture** principles with clear separation of concerns:
 ```
-┌─────────────────────────────────────────────────┐
-│           API Layer (Controllers)               │
-│   - HTTP Endpoints                              │
-│   - Request/Response Handling                   │
-│   - Authentication & Authorization              │
-└────────────────┬────────────────────────────────┘
-                 │
-                 ↓
-┌─────────────────────────────────────────────────┐
-│      Application Layer (Business Logic)         │
-│   - ATMService                                   │
-│   - StatusReportService (Crowd-sourcing)        │
-│   - UserService                                  │
-│   - AuthService                                  │
-└────────────────┬────────────────────────────────┘
-                 │
-                 ↓
-┌─────────────────────────────────────────────────┐
-│        Core Layer (Domain Entities)             │
-│   - ATM, User, StatusReport entities            │
-│   - Repository interfaces                       │
-│   - Business rules & domain logic               │
-└────────────────┬────────────────────────────────┘
-                 │
-                 ↑ (implements)
-┌─────────────────────────────────────────────────┐
-│     Infrastructure Layer (Data Access)          │
-│   - MongoDB repositories                        │
-│   - Database context                            │
-│   - External service integrations               │
-└─────────────────────────────────────────────────┘
-```
-
-**Benefits**:
-- ✅ Testable: Each layer can be tested independently
-- ✅ Maintainable: Changes in one layer don't affect others
-- ✅ Flexible: Easy to swap databases or frameworks
-- ✅ Scalable: Can grow without major refactoring
-
----
-
-## 🛠️ Technology Stack
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **Framework** | .NET 8 | Backend API framework |
-| **Database** | MongoDB 7.0 | NoSQL document database |
-| **Authentication** | JWT | Token-based auth |
-| **Validation** | FluentValidation | Input validation |
-| **Documentation** | Swagger/OpenAPI | API documentation |
-| **Testing** | xUnit + Moq | Unit testing |
-| **ORM** | MongoDB.Driver | Database connectivity |
-
-### Key NuGet Packages
-```xml
-<PackageReference Include="MongoDB.Driver" Version="3.5.2" />
-<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
-<PackageReference Include="FluentValidation.AspNetCore" Version="11.3.0" />
-<PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
-<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.15.0" />
+┌─────────────────────────────────────────┐
+│          API Layer (Controllers)        │  ← HTTP, auth, routing
+├─────────────────────────────────────────┤
+│    Application Layer (Business Logic)   │  ← Services, DTOs, validators
+├─────────────────────────────────────────┤
+│       Core Layer (Domain Entities)      │  ← Entities, interfaces, rules
+├─────────────────────────────────────────┤
+│   Infrastructure Layer (Data Access)    │  ← MongoDB repositories
+└─────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Getting Started
+## Technology Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Backend | .NET 8, C# |
+| Database | MongoDB Atlas |
+| Authentication | JWT Bearer |
+| Validation | FluentValidation |
+| API Docs | Swagger / OpenAPI |
+| Frontend | React 18, Vite, Tailwind CSS |
+| Map | React Leaflet (OpenStreetMap) |
+| Deployment | Render (Docker) |
+
+---
+
+## Project Structure
+
+```
+KudivilaATMLocator/
+├── ATMLocator.API/                  # Web API — controllers, middleware, startup
+│   ├── Controllers/
+│   │   ├── ATMController.cs         # ATM CRUD + nearby search
+│   │   ├── ReportController.cs      # /api/reports (frontend-compatible)
+│   │   ├── StatusReportController.cs
+│   │   ├── AuthController.cs
+│   │   ├── UserController.cs
+│   │   └── AnalyticsController.cs
+│   ├── Middleware/
+│   │   ├── ApiKeyMiddleware.cs
+│   │   ├── ErrorHandlingMiddleware.cs
+│   │   ├── RequestLoggingMiddleware.cs
+│   │   ├── SecurityHeadersMiddleware.cs
+│   │   └── CorrelationIdMiddleware.cs
+│   └── Program.cs
+│
+├── ATMLocator.Application/          # Business logic — services, DTOs, validators
+├── ATMLocator.Core/                 # Domain — entities, interfaces, settings
+├── ATMLocator.Infrastructure/       # Data access — MongoDB repositories
+├── ATMLocator.Tests/                # Unit + integration tests
+│
+├── frontend/                        # React web app
+│   ├── src/
+│   │   ├── api/base44Client.js      # Custom API client → KudiLoc C# API
+│   │   ├── pages/                   # Home, ATMDetail, ReportATM, Profile
+│   │   └── components/              # Map, ATM markers, bottom sheets
+│   └── package.json
+│
+├── Dockerfile
+├── docker-compose.yml
+├── render.yaml
+└── KudiLoc.sln
+```
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [MongoDB](https://www.mongodb.com/try/download/community) (local or Atlas)
-- [Git](https://git-scm.com/)
+- [MongoDB](https://www.mongodb.com/try/download/community) or a [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) connection string
+- [Node.js 18+](https://nodejs.org/) (for the frontend)
 
-### Installation
+### 1. Clone
 
-1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/kudivila-api.git
-cd kudivila-api
+git clone https://github.com/kiumaveloso/KudiLoc.git
+cd KudiLoc/KudivilaATMLocator
 ```
 
-2. **Install dependencies**
-```bash
-dotnet restore
-```
-
-3. **Configure MongoDB**
+### 2. Configure the API
 
 Edit `ATMLocator.API/appsettings.json`:
+
 ```json
 {
   "MongoDbSettings": {
     "ConnectionString": "mongodb://localhost:27017",
-    "DatabaseName": "KudividaATMLocator",
-    "ATMsCollectionName": "atms",
-    "StatusReportsCollectionName": "status_reports",
-    "UsersCollectionName": "users"
+    "DatabaseName": "KudiLoc"
   },
   "Jwt": {
-    "Key": "YourSuperSecretKeyThatIsAtLeast32CharactersLong!",
-    "Issuer": "KudividaAPI",
-    "Audience": "KudividaApp"
+    "Key": "YourSecretKeyAtLeast32CharactersLong!",
+    "Issuer": "KudiLoc",
+    "Audience": "KudiLoc",
+    "ExpirationDays": 30
   }
 }
 ```
 
-4. **Run MongoDB**
-```bash
-# Using Docker
-docker run -d -p 27017:27017 --name mongodb mongo:7.0
+### 3. Run the API
 
-# Or start local MongoDB service
-mongod
-```
-
-5. **Build and run**
 ```bash
 cd ATMLocator.API
 dotnet run
 ```
 
-6. **Access Swagger UI**
+- API: `http://localhost:5000`
+- Swagger: `http://localhost:5000/swagger`
 
-Navigate to: **http://localhost:5000**
+### 4. Run the Frontend
+
+```bash
+cd frontend
+npm install
+VITE_API_URL=http://localhost:5000 npm run dev
+```
+
+- Frontend: `http://localhost:5173`
+
+### 5. Docker (optional)
+
+```bash
+docker-compose up
+```
 
 ---
 
-## 📖 API Documentation
+## API Reference
+
+All responses use **snake_case** field names. No authentication required for browsing ATMs or submitting reports.
 
 ### Authentication
 
-All protected endpoints require JWT token:
-```bash
-Authorization: Bearer YOUR_JWT_TOKEN_HERE
-```
-
-### Core Endpoints
-
-#### **Authentication**
 ```http
-POST /api/Auth/register          # Register new user
-POST /api/Auth/login             # Login and get JWT token
+POST /api/auth/register      # Register with phone number
+POST /api/auth/login         # Login, returns JWT
+POST /api/auth/otp/request   # Request OTP code
+POST /api/auth/otp/verify    # Verify OTP, returns JWT
+GET  /api/auth/me            # Current user profile (requires JWT)
 ```
 
-#### **ATM Management**
+### ATMs
+
 ```http
-GET  /api/ATM/nearby?latitude={lat}&longitude={lon}&radiusKm={km}
-GET  /api/ATM/{id}
-GET  /api/ATM/province/{province}
-GET  /api/ATM/search?query={term}
-GET  /api/ATM/bank/{bankName}
-POST /api/ATM                    # 🔒 Requires Auth
-POST /api/ATM/{id}/photo         # 🔒 Requires Auth
+# List / filter (no auth required)
+GET  /api/atm                                     # All ATMs, sorted by updated_date
+GET  /api/atm?id={id}                             # Filter by ID (returns array)
+GET  /api/atm?sort=-updated_date&limit=200
+
+# Geospatial search
+GET  /api/atm/nearby?latitude={lat}&longitude={lon}&radiusKm={km}
+POST /api/atm/nearby/auto                         # Body: { latitude, longitude, radiusKm }
+POST /api/atm/nearby/auto/sorted                  # Sorted by walking distance
+
+# Lookup
+GET  /api/atm/{id}
+GET  /api/atm/search?query={term}
+GET  /api/atm/province/{province}
+GET  /api/atm/bank/{bankName}
+
+# Write (no auth required)
+POST   /api/atm                                   # Create ATM
+PATCH  /api/atm/{id}                              # Partial update (status, connectivity…)
+PUT    /api/atm/{id}                              # Full update
+DELETE /api/atm/{id}                              # Delete
+
+# Media
+POST /api/atm/{id}/photo                          # Upload photo (requires JWT)
 ```
 
-#### **Status Reports**
-```http
-POST /api/StatusReport           # 🔒 Submit cash availability report
-GET  /api/StatusReport/atm/{atmId}
-```
-
-#### **User Management**
-```http
-GET  /api/User/{id}              # 🔒 Requires Auth
-GET  /api/User/phone/{phoneNumber}  # 🔒 Requires Auth
-```
-
-#### **Analytics**
-```http
-GET  /api/Analytics/stats        # System-wide statistics
-GET  /api/Analytics/atm/{atmId}/activity  # ATM activity history
-```
-
-#### **System**
-```http
-GET  /                           # API status
-GET  /health                     # Health check
-```
-
-### Example: Register User & Submit Report
-```bash
-# 1. Register a new user
-curl -X POST http://localhost:5000/api/Auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phoneNumber": "+244923456789",
-    "name": "João Silva"
-  }'
-
-# Response:
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "userId": "677d8c9a1234567890abcdef",
-  "phoneNumber": "+244923456789",
-  "name": "João Silva",
-  "reputationScore": 50
-}
-
-# 2. Submit ATM status report (using token from step 1)
-curl -X POST http://localhost:5000/api/StatusReport \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
-  -d '{
-    "atmId": "677d8c9a1234567890abcdef",
-    "userId": "677d8d1a9876543210fedcba",
-    "hasCash": true,
-    "notes": "Funcionando perfeitamente, levantei 50.000 Kz"
-  }'
-```
-
-### Example: Find Nearby ATMs
-```bash
-curl "http://localhost:5000/api/ATM/nearby?latitude=-8.8383&longitude=13.2344&radiusKm=5"
-```
-
-**Response:**
+**ATM response format:**
 ```json
-[
-  {
-    "id": "677d8c9a1234567890abcdef",
-    "name": "ATM BFA Talatona",
-    "bankName": "Banco Fomento Angola",
-    "location": {
-      "latitude": -8.9470,
-      "longitude": 13.1844,
-      "province": "Luanda",
-      "municipality": "Talatona"
-    },
-    "status": {
-      "hasCash": true,
-      "reliabilityScore": 87,
-      "lastVerified": "2026-01-07T10:30:00Z",
-      "statusDescription": "Confirmado com dinheiro"
-    },
-    "address": {
-      "street": "Rua Principal de Talatona",
-      "neighborhood": "Talatona",
-      "landmark": "Shopping Xyami"
-    }
-  }
-]
+{
+  "id": "abc123",
+  "bank_name": "Banco BAI",
+  "location_name": "Talatona Shopping, piso 0",
+  "latitude": -8.9470,
+  "longitude": 13.1844,
+  "status": "has_money",
+  "is_online": "online",
+  "has_paper": true,
+  "reliability_score": 87,
+  "recent_reports_count": 4,
+  "last_report_time": "2026-03-11T10:30:00Z",
+  "updated_date": "2026-03-11T10:30:00Z"
+}
+```
+
+### Reports
+
+```http
+POST /api/reports                                 # Submit report (no auth required)
+GET  /api/reports?atm_id={id}&limit=20            # Reports for an ATM
+GET  /api/reports?created_by={email}&limit=100    # Reports by a user
+GET  /api/statusreport/atm/{atmId}                # Paginated report history
+```
+
+**Submit report:**
+```json
+{
+  "atm_id": "abc123",
+  "status_reported": "has_money",
+  "reporter_reputation": 50
+}
+```
+
+### Users & Analytics
+
+```http
+GET    /api/user/{id}                 # Requires JWT
+PUT    /api/user/{id}                 # Update profile
+DELETE /api/user/{id}                 # Delete account
+GET    /api/analytics/stats           # System-wide statistics
+GET    /api/analytics/atm/{id}/activity
+```
+
+### System
+
+```http
+GET /health       # Instant health check (always 200)
+GET /health/db    # MongoDB connectivity check
+GET /             # API version and status
+GET /swagger      # Interactive API documentation
 ```
 
 ---
 
-## 🧮 Crowd-Sourcing Algorithm
+## Crowd-Sourcing Algorithm
 
-### The Intelligence Behind Kudivila
+Reports from the last **30 minutes** are collected per ATM. Each report is weighted by reporter reputation:
 
-Kudivila's core innovation is its **reputation-weighted crowd-sourcing algorithm** that determines ATM cash availability:
-
-#### 1️⃣ **Report Submission**
-User submits: "ATM has cash" or "ATM has no cash"
-
-#### 2️⃣ **Time Window**
-Only reports from last **30 minutes** are considered (recent = relevant)
-
-#### 3️⃣ **Weighted Voting**
-Each report's weight is calculated based on user reputation:
-```csharp
-double weight = 0.5 + (userReputationScore / 100.0);
-
-// Examples:
-// Reputation 0   → Weight 0.5 (low trust)
-// Reputation 50  → Weight 1.0 (neutral)
-// Reputation 100 → Weight 1.5 (high trust)
+```
+weight = 0.5 + (reputation / 100)
 ```
 
-#### 4️⃣ **Consensus Calculation**
-```csharp
-// Separate reports by status
-var hasCashReports = reports.Where(r => r.HasCash);
-var noCashReports = reports.Where(r => !r.HasCash);
+The side (has money / no money) with the higher total weight wins. A reliability score (0–100) is then calculated:
 
-// Calculate weighted totals
-double hasCashWeight = hasCashReports.Sum(r => GetUserWeight(r.UserId));
-double noCashWeight = noCashReports.Sum(r => GetUserWeight(r.UserId));
+| Component | Max Points | Description |
+|-----------|-----------|-------------|
+| Volume bonus | 50 | More reports = higher confidence |
+| Consensus bonus | 30 | How unanimous the reports are |
+| Trust bonus | 20 | Winning side's total reputation weight |
 
-// Determine status
-bool atmHasCash = hasCashWeight > noCashWeight;
-```
-
-#### 5️⃣ **Reliability Score** (0-100)
-```csharp
-int reliabilityScore = 
-    Math.Min(totalReports * 10, 50) +           // Volume bonus (max 50)
-    (int)((winningCount / totalReports) * 30) + // Consensus bonus (max 30)
-    Math.Min((int)(winningWeight * 5), 20);     // Trust bonus (max 20)
-```
-
-#### 6️⃣ **Reputation Update**
-```csharp
-// User matches consensus: +2 reputation (max 100)
-// User contradicts consensus: -3 reputation (min 0)
-```
-
-### Real-World Example
-
-**Scenario**: BFA Talatona ATM has 5 reports in last 30 minutes
-
-| User | Reputation | Report | Weight |
-|------|-----------|--------|--------|
-| User A | 85 | Has cash ✅ | 1.35 |
-| User B | 90 | Has cash ✅ | 1.40 |
-| User C | 75 | Has cash ✅ | 1.25 |
-| User D | 30 | No cash ❌ | 0.80 |
-| User E | 95 | Has cash ✅ | 1.45 |
-
-**Calculation**:
-```
-"Has cash" votes:  1.35 + 1.40 + 1.25 + 1.45 = 5.45
-"No cash" votes:   0.80
-
-Winner: "Has cash" (5.45 > 0.80)
-
-Reliability Score:
-  Base:      5 reports × 10 = 50 points
-  Consensus: 4/5 = 80% → 24 points
-  Trust:     5.45 × 5 = 27 (capped at 20 points)
-  
-  Total: 50 + 24 + 20 = 94/100 ✅
-```
-
-**Result**: ATM status = "Has cash" with 94% reliability
-
-### Why This Works
-
-✅ **Self-Correcting**: Bad actors automatically get low reputation  
-✅ **Spam-Resistant**: Single fake report can't change status  
-✅ **Rewards Accuracy**: Good reporters gain influence over time  
-✅ **Time-Weighted**: Recent reports matter more than old ones  
-✅ **Transparent**: Users see reliability scores
+After each report cycle, accurate reporters gain **+2 reputation**; reporters who contradict consensus lose **-3 reputation**.
 
 ---
 
-## 🧪 Testing
+## Frontend
 
-### Run All Tests
+The React frontend lives at `KudivilaATMLocator/frontend/`.
+
+**Features:**
+- Interactive map with real-time ATM markers (Leaflet + OpenStreetMap)
+- Report cash status, connectivity, and paper availability directly from the map
+- ATM detail page with reliability ring, report history, and Google Maps navigation
+- Add new ATMs using GPS coordinates
+- Favorites stored locally in the browser
+
+**To build for production:**
+```bash
+cd KudivilaATMLocator/frontend
+npm install
+VITE_API_URL=https://kudiloc-api.onrender.com npm run build
+```
+
+The `VITE_API_URL` environment variable tells the frontend which API to connect to.
+
+---
+
+## Deployment
+
+The project is configured for **Render** using `render.yaml`. Every push to `main` triggers an automatic redeploy.
+
+### Steps
+
+1. Connect the `kiumaveloso/KudiLoc` GitHub repo to [Render](https://render.com)
+2. Render reads `render.yaml` and configures the service automatically
+3. Set one environment variable manually in the Render dashboard:
+   - `MongoDbSettings__ConnectionString` — your MongoDB Atlas URI
+
+### Environment Variables
+
+| Variable | Description | Source |
+|----------|-------------|--------|
+| `MongoDbSettings__ConnectionString` | MongoDB Atlas URI | Set manually |
+| `MongoDbSettings__DatabaseName` | Database name | `render.yaml` (`KudiLoc`) |
+| `Jwt__Key` | JWT signing key | Auto-generated by Render |
+| `ASPNETCORE_ENVIRONMENT` | Runtime environment | `render.yaml` (`Production`) |
+| `ApiKey` | Optional endpoint protection key | Set manually if needed |
+
+### Docker
+
+```bash
+cd KudivilaATMLocator
+docker build -t kudiloc-api .
+docker run -p 5000:8080 \
+  -e MongoDbSettings__ConnectionString="your-atlas-uri" \
+  kudiloc-api
+```
+
+---
+
+## Testing
+
 ```bash
 cd KudivilaATMLocator
 dotnet test
 ```
 
-### Test Coverage
-- **22 unit tests** covering all critical functionality
-- **Coverage**: ~80% of business logic
-- **Test Framework**: xUnit + Moq + FluentAssertions
-
-### Test Categories
-
-| Category | Tests | Description |
-|----------|-------|-------------|
-| ATM Service | 9 | CRUD, search, filtering, sorting |
-| Status Report Service | 5 | Crowd-sourcing logic, validation |
-| User Service | 5 | Registration, retrieval |
-| Auth Service | 4 | Login, register, JWT generation |
-
-### Example Test
-```csharp
-[Fact]
-public async Task GetNearbyATMs_OnlyReturnsATMsWithCash()
-{
-    // Arrange
-    var mockRepo = new Mock<IATMRepository>();
-    var testATMs = new List<ATM>
-    {
-        CreateTestATM("1", hasCash: true, reliabilityScore: 80),
-        CreateTestATM("2", hasCash: false, reliabilityScore: 50)
-    };
-    mockRepo.Setup(r => r.GetNearbyAsync(...)).ReturnsAsync(testATMs);
-    var service = new ATMService(mockRepo.Object);
-
-    // Act
-    var result = await service.GetNearbyATMsWithCashAsync(-8.8, 13.2, 10);
-
-    // Assert
-    result.Should().HaveCount(1);
-    result[0].Status.HasCash.Should().BeTrue();
-}
-```
+| Suite | Tests | What it covers |
+|-------|-------|----------------|
+| ATM Service | 9 | CRUD, search, geospatial |
+| Status Report Service | 5 | Crowd-sourcing, cooldowns, reputation |
+| User Service | 5 | Registration, retrieval, updates |
+| Auth Service | 4 | JWT generation, login, register |
+| Integration | 15 | Full HTTP request/response cycle |
 
 ---
 
-## 🚀 Deployment
+## Contributing
 
-### Option 1: Azure App Service (Recommended)
-```bash
-# Install Azure CLI
-az login
-
-# Create resources
-az group create --name kudivila-rg --location southafricawest
-az appservice plan create --name kudivila-plan --resource-group kudivila-rg --sku B1 --is-linux
-az webapp create --resource-group kudivila-rg --plan kudivila-plan --name kudivila-api --runtime "DOTNETCORE:8.0"
-
-# Deploy
-dotnet publish -c Release
-cd bin/Release/net8.0/publish
-zip -r deploy.zip .
-az webapp deployment source config-zip --resource-group kudivila-rg --name kudivila-api --src deploy.zip
-```
-
-### Option 2: Docker
-```dockerfile
-# Dockerfile
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-WORKDIR /app
-EXPOSE 80
-
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
-COPY ["ATMLocator.API/ATMLocator.API.csproj", "ATMLocator.API/"]
-RUN dotnet restore "ATMLocator.API/ATMLocator.API.csproj"
-COPY . .
-WORKDIR "/src/ATMLocator.API"
-RUN dotnet build "ATMLocator.API.csproj" -c Release -o /app/build
-
-FROM build AS publish
-RUN dotnet publish "ATMLocator.API.csproj" -c Release -o /app/publish
-
-FROM base AS final
-WORKDIR /app
-COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "ATMLocator.API.dll"]
-```
-```bash
-# Build and run
-docker build -t kudivila-api .
-docker run -d -p 5000:80 --name kudivila-api kudivila-api
-```
-
-### Environment Variables (Production)
-```bash
-MongoDbSettings__ConnectionString="mongodb+srv://user:pass@cluster.mongodb.net"
-MongoDbSettings__DatabaseName="KudividaATMLocator"
-Jwt__Key="YourProductionSecretKey32CharsMin!"
-Jwt__Issuer="KudividaAPI"
-Jwt__Audience="KudividaApp"
-```
-
-### MongoDB Atlas Setup
-
-1. Create account at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
-2. Create free M0 cluster (512MB)
-3. Choose **AWS - Cape Town** (closest to Angola)
-4. Create database user
-5. Whitelist IP: `0.0.0.0/0`
-6. Get connection string
-7. Update `appsettings.Production.json`
+1. Fork the repository
+2. Create a branch: `git checkout -b feature/your-feature`
+3. Commit your changes
+4. Open a Pull Request
 
 ---
 
-## 📁 Project Structure
-```
-KudivilaATMLocator/
-│
-├── ATMLocator.API/                    # 🌐 Web API Layer
-│   ├── Controllers/
-│   │   ├── ATMController.cs          # ATM endpoints
-│   │   ├── StatusReportController.cs # Reporting endpoints
-│   │   ├── UserController.cs         # User management
-│   │   ├── AuthController.cs         # Authentication
-│   │   └── AnalyticsController.cs    # Statistics
-│   ├── Middleware/
-│   │   ├── ErrorHandlingMiddleware.cs
-│   │   └── RequestLoggingMiddleware.cs
-│   ├── HealthChecks/
-│   │   └── MongoDbHealthCheck.cs
-│   ├── Services/
-│   │   └── PhotoService.cs
-│   └── Program.cs                     # Startup configuration
-│
-├── ATMLocator.Application/            # 💼 Business Logic
-│   ├── DTOs/
-│   │   └── CreateATMDto.cs           # Request/response models
-│   ├── Services/
-│   │   ├── ATMService.cs             # ATM operations
-│   │   ├── StatusReportService.cs    # Crowd-sourcing logic ⭐
-│   │   ├── UserService.cs            # User management
-│   │   └── AuthService.cs            # JWT authentication
-│   └── Validators/
-│       └── CreateATMDtoValidator.cs   # FluentValidation rules
-│
-├── ATMLocator.Core/                   # 🎯 Domain Layer
-│   ├── Entities/
-│   │   ├── ATM.cs                    # ATM entity
-│   │   ├── StatusReport.cs           # Report entity
-│   │   └── User.cs                   # User entity
-│   ├── Interfaces/
-│   │   ├── IATMRepository.cs
-│   │   ├── IStatusReportRepository.cs
-│   │   └── IUserRepository.cs
-│   └── Settings/
-│       └── JwtSettings.cs
-│
-├── ATMLocator.Infrastructure/         # 🗄️ Data Access
-│   ├── Configuration/
-│   │   └── MongoDbSettings.cs
-│   ├── Data/
-│   │   └── MongoDbContext.cs         # MongoDB connection
-│   └── Repositories/
-│       ├── ATMRepository.cs          # ATM data access
-│       ├── StatusReportRepository.cs
-│       └── UserRepository.cs
-│
-└── ATMLocator.Tests/                  # 🧪 Unit Tests
-    ├── Services/
-    │   ├── ATMServiceTests.cs        # 9 tests
-    │   ├── StatusReportServiceTests.cs # 5 tests
-    │   ├── UserServiceTests.cs       # 5 tests
-    │   └── AuthServiceTests.cs       # 4 tests
-    └── ATMLocator.Tests.csproj
-```
+## Author
+
+**Veloso** — [@kiumaveloso](https://github.com/kiumaveloso)
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. **Fork the repository**
-2. **Create a feature branch** (`git checkout -b feature/AmazingFeature`)
-3. **Commit your changes** (`git commit -m 'Add some AmazingFeature'`)
-4. **Push to the branch** (`git push origin feature/AmazingFeature`)
-5. **Open a Pull Request**
-
-### Coding Standards
-
-- Follow C# coding conventions
-- Write unit tests for new features
-- Update documentation
-- Ensure all tests pass before submitting PR
-
-### Areas for Contribution
-
-- 🌍 Add support for more Angolan provinces
-- 📱 Mobile SDK development
-- 🔍 Enhanced search algorithms
-- 📊 Advanced analytics features
-- 🌐 Internationalization (Portuguese, English, Kimbundu, Umbundu)
-- 🚀 Performance optimizations
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 👨‍💻 Author
-
-**Veloso**
-- GitHub: [@kiumaveloso](https://github.com/kiumaveloso)
-
----
-
-## 🙏 Acknowledgments
-
-- Built with [.NET 8](https://dotnet.microsoft.com/)
-- Database powered by [MongoDB](https://www.mongodb.com/)
-- Inspired by the need to solve real problems in Angola
-- Thanks to the Angolan tech community for feedback and support
-
----
-
-## 📊 Project Status
-
-**Current Status**: Production-ready API, mobile app in development
-
-### Roadmap
-
-**Phase 1 - MVP** ✅ (Complete)
-- ✅ Core API functionality
-- ✅ Crowd-sourcing algorithm
-- ✅ JWT authentication
-- ✅ Comprehensive testing
-- ✅ API documentation
-
-**Phase 2 - Launch** 🚧 (In Progress)
-- ⏳ Cloud deployment
-- ⏳ Mobile app (Flutter)
-- ⏳ Beta testing
-- ⏳ Production monitoring
-
-**Phase 3 - Growth** 🔮 (Planned)
-- 📱 iOS & Android apps in stores
-- 🏦 Bank partnerships
-- 📊 Advanced analytics dashboard
-- 🤖 Machine learning predictions
-- 🌍 Expansion to other African countries
-
----
-
-<p align="center">
-  <sub>Making cash more accessible, one ATM at a time.</sub>
-</p>
+<p align="center">Making cash more accessible, one ATM at a time.</p>
