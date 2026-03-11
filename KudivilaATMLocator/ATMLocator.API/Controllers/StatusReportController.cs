@@ -16,7 +16,7 @@ public class StatusReportController : ControllerBase
     private readonly ILogger<StatusReportController> _logger;
 
     public StatusReportController(
-        IStatusReportService reportService, 
+        IStatusReportService reportService,
         ILogger<StatusReportController> logger)
     {
         _reportService = reportService;
@@ -24,9 +24,10 @@ public class StatusReportController : ControllerBase
     }
 
     /// <summary>
-    /// Submit a status report for an ATM (crowd-sourcing)
+    /// Submit a status report for an ATM (crowd-sourcing).
+    /// AllowAnonymous for kudi-cash-find frontend compatibility.
     /// </summary>
-    [Authorize]
+    [AllowAnonymous]
     [HttpPost]
     public async Task<ActionResult<StatusReportResponseDto>> SubmitReport(
         [FromBody] CreateStatusReportDto dto)
@@ -34,10 +35,10 @@ public class StatusReportController : ControllerBase
         try
         {
             var report = await _reportService.SubmitReportAsync(dto);
-            return Ok(new 
-            { 
+            return Ok(new
+            {
                 message = "Relatório submetido com sucesso! Obrigado por ajudar a comunidade.",
-                report 
+                report
             });
         }
         catch (ArgumentException ex)

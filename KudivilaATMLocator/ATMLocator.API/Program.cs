@@ -56,7 +56,13 @@ builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
     options.Level = CompressionLevel.Fastest);
 builder.Services.Configure<GzipCompressionProviderOptions>(options =>
     options.Level = CompressionLevel.SmallestSize);
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // kudi-cash-find frontend expects snake_case field names
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+        options.JsonSerializerOptions.DictionaryKeyPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+    });
 
 // API Versioning
 builder.Services.AddApiVersioning(options =>
@@ -173,24 +179,14 @@ builder.Services.AddHealthChecks()
 // Configure CORS
 // In Development: allow any origin so frontend devs can connect from any host.
 // In Production: restrict to the configured allowed origins list.
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-var isDevelopment = builder.Environment.IsDevelopment();
+// CORS is open to any origin — access control is handled by ApiKeyMiddleware.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("KudiLocPolicy", policy =>
     {
-        if (isDevelopment || allowedOrigins.Length == 0)
-        {
-            policy.AllowAnyOrigin()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        }
-        else
-        {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        }
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
     });
 });
 
@@ -250,6 +246,10 @@ app.UseRouting();
 
 // CORS must come after UseRouting so endpoints are matched before CORS headers are applied
 app.UseCors("KudiLocPolicy");
+
+// API Key enforcement — requests without a valid X-API-Key header are rejected with 401.
+// Set the ApiKey environment variable on Render to enable. Leave unset to disable locally.
+app.UseMiddleware<ApiKeyMiddleware>();
 
 // Correlation ID for request tracing (reads or generates X-Correlation-Id)
 app.UseMiddleware<CorrelationIdMiddleware>();

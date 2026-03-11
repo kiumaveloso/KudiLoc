@@ -70,6 +70,15 @@ public class StatusReportRepository : IStatusReportRepository
         return await _context.StatusReports.CountDocumentsAsync(_ => true);
     }
 
+    public async Task<List<StatusReport>> GetByCreatedByAsync(string createdBy, int limit = 100)
+    {
+        return await _context.StatusReports
+            .Find(report => report.CreatedBy == createdBy)
+            .SortByDescending(report => report.ReportedAt)
+            .Limit(limit)
+            .ToListAsync();
+    }
+
     public async Task<StatusReport?> GetLastReportByUserForATM(string userId, string atmId)
     {
         var filter = Builders<StatusReport>.Filter.And(

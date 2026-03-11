@@ -16,3 +16,22 @@ public record ATMDto(
     List<string> SupportedServices,
     List<string> PhotoUrls
 );
+
+/// <summary>
+/// Flat DTO for kudi-cash-find frontend compatibility.
+/// Uses snake_case field names via JSON serializer configuration.
+/// </summary>
+public record FlatATMDto(
+    string Id,
+    string BankName,
+    string LocationName,
+    double Latitude,
+    double Longitude,
+    string Status,
+    string IsOnline,
+    bool HasPaper,
+    int ReliabilityScore,
+    int RecentReportsCount,
+    DateTime? LastReportTime,
+    DateTime UpdatedDate
+);

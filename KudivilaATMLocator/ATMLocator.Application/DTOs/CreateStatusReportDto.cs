@@ -2,8 +2,11 @@ namespace ATMLocator.Application.DTOs;
 
 public record CreateStatusReportDto(
     string ATMId,
-    string UserId,
+    string? UserId,
     bool HasCash,
+    string? StatusReported,
     string? OperationalStatus,
-    string? Notes
+    string? Notes,
+    int? ReporterReputation,
+    string? CreatedBy
 );

@@ -39,13 +39,18 @@ public class StatusReportControllerTests : IClassFixture<CustomWebApplicationFac
     }
 
     [Fact]
-    public async Task SubmitReport_WithoutAuth_ReturnsUnauthorized()
+    public async Task SubmitReport_WithoutAuth_WhenATMNotFound_ReturnsBadRequest_Anonymous()
     {
-        var dto = new CreateStatusReportDto("atm1", "user1", true, null, null);
+        // POST /api/statusreport is now AllowAnonymous for kudi-cash-find compatibility
+        _factory.MockATMRepository
+            .Setup(r => r.GetByIdAsync("atm1"))
+            .ReturnsAsync((ATM?)null);
+
+        var dto = new CreateStatusReportDto("atm1", null, true, null, null, null, null, null);
 
         var response = await _client.PostAsJsonAsync("/api/StatusReport", dto);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     [Fact]
@@ -58,7 +63,7 @@ public class StatusReportControllerTests : IClassFixture<CustomWebApplicationFac
             .Setup(r => r.GetByIdAsync("nonexistent"))
             .ReturnsAsync((ATM?)null);
 
-        var dto = new CreateStatusReportDto("nonexistent", "user1", true, null, null);
+        var dto = new CreateStatusReportDto("nonexistent", "user1", true, null, null, null, null, null);
         var response = await _client.PostAsJsonAsync("/api/StatusReport", dto);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);

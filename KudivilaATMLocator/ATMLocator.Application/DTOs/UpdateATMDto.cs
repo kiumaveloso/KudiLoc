@@ -5,10 +5,16 @@ public record UpdateATMDto(
     string? BankName,
     double? Latitude,
     double? Longitude,
+    string? LocationName,
     string? Province,
     string? Municipality,
     string? Street,
     string? Neighborhood,
     string? Landmark,
-    List<string>? SupportedServices
+    List<string>? SupportedServices,
+    string? Status,
+    string? IsOnline,
+    bool? HasPaper,
+    DateTime? LastReportTime,
+    int? RecentReportsCount
 );

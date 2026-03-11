@@ -17,5 +17,6 @@ public interface IATMRepository
     Task<ATM> CreateAsync(ATM atm);
     Task<ATM> UpdateAsync(ATM atm);
     Task<bool> DeleteAsync(string id);
-    Task<bool> AddPhotoAsync(string atmId, string photoUrl); // NEW
+    Task<bool> AddPhotoAsync(string atmId, string photoUrl);
+    Task<List<ATM>> GetAllSortedByUpdatedAsync(int limit = 200);
 }

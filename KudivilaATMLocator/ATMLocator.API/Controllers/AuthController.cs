@@ -108,7 +108,9 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Get the current authenticated user's profile
+    /// Get the current authenticated user's profile.
+    /// Returns snake_case fields including full_name, email, reputation_score
+    /// for kudi-cash-find frontend compatibility.
     /// </summary>
     [Authorize]
     [HttpGet("me")]
@@ -126,10 +128,14 @@ public class AuthController : ControllerBase
             return NotFound(new { statusCode = 404, message = "Utilizador não encontrado" });
         }
 
+        // Return fields in a format compatible with both the original app and kudi-cash-find.
+        // The JSON serializer will convert to snake_case (full_name, reputation_score, etc.)
         return Ok(new
         {
             user.Id,
             user.PhoneNumber,
+            FullName = user.Name ?? string.Empty,
+            Email = user.PhoneNumber, // kudi-cash-find uses email; map phone as fallback
             user.Name,
             user.ReputationScore,
             user.TotalReports,

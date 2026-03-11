@@ -11,4 +11,5 @@ public interface IStatusReportRepository
     Task<StatusReport?> GetLastReportByUserForATM(string userId, string atmId);
     Task<long> CountByATMIdAsync(string atmId);
     Task<long> CountAllAsync();
+    Task<List<StatusReport>> GetByCreatedByAsync(string createdBy, int limit = 100);
 }

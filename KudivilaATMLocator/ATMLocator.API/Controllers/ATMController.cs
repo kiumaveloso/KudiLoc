@@ -33,10 +33,44 @@ public class ATMController : ControllerBase
         _atmSettings = atmSettings.Value;
     }
 
+    /// <summary>
+    /// List all ATMs in flat format for kudi-cash-find frontend.
+    /// Supports ?id= filter, ?sort= and ?limit= query params.
+    /// </summary>
+    [HttpGet]
+    public async Task<ActionResult<List<FlatATMDto>>> GetAllATMs(
+        [FromQuery] string? sort = "-updated_date",
+        [FromQuery] int limit = 200,
+        [FromQuery] string? id = null)
+    {
+        try
+        {
+            // If id query param is provided, return a single-item array with that ATM
+            if (!string.IsNullOrEmpty(id))
+            {
+                var singleAtm = await _atmService.GetFlatATMByIdAsync(id);
+                if (singleAtm == null)
+                {
+                    return Ok(new List<FlatATMDto>());
+                }
+                return Ok(new List<FlatATMDto> { singleAtm });
+            }
+
+            limit = Math.Clamp(limit, 1, 500);
+            var atms = await _atmService.GetAllATMsFlatAsync(limit);
+            return Ok(atms);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all ATMs");
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao buscar caixas automáticos" });
+        }
+    }
+
     [HttpGet("nearby")]
     public async Task<ActionResult<List<ATMDto>>> GetNearbyATMs(
-        [FromQuery] double latitude, 
-        [FromQuery] double longitude, 
+        [FromQuery] double latitude,
+        [FromQuery] double longitude,
         [FromQuery] double? radiusKm = null)
     {
         try
@@ -73,13 +107,13 @@ public class ATMController : ControllerBase
                     _atmSettings.FallbackSearchRadiusKm
                 );
             }
-            
+
             return Ok(new
             {
-                userLocation = new 
-                { 
-                    latitude = location.Latitude, 
-                    longitude = location.Longitude 
+                userLocation = new
+                {
+                    latitude = location.Latitude,
+                    longitude = location.Longitude
                 },
                 searchRadius = radiusKm,
                 totalATMsFound = atms.Count,
@@ -88,7 +122,7 @@ public class ATMController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting ATMs at user location: {Lat}, {Lon}", 
+            _logger.LogError(ex, "Error getting ATMs at user location: {Lat}, {Lon}",
                 location.Latitude, location.Longitude);
             return StatusCode(500, new { statusCode = 500, message = "Erro ao buscar caixas automáticos próximos" });
         }
@@ -100,11 +134,11 @@ public class ATMController : ControllerBase
         try
         {
             var atms = await _atmService.GetNearbyATMsWithCashAsync(
-                location.Latitude, 
-                location.Longitude, 
+                location.Latitude,
+                location.Longitude,
                 location.RadiusKm ?? _atmSettings.DefaultSearchRadiusKm
             );
-            
+
             var atmsWithDistance = atms.Select(atm => new
             {
                 atm.Id,
@@ -124,13 +158,13 @@ public class ATMController : ControllerBase
             })
             .OrderBy(x => x.distanceKm)
             .ToList();
-            
+
             return Ok(new
             {
-                userLocation = new 
-                { 
-                    latitude = location.Latitude, 
-                    longitude = location.Longitude 
+                userLocation = new
+                {
+                    latitude = location.Latitude,
+                    longitude = location.Longitude
                 },
                 totalATMsFound = atmsWithDistance.Count,
                 atms = atmsWithDistance
@@ -138,7 +172,7 @@ public class ATMController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting sorted ATMs: {Lat}, {Lon}", 
+            _logger.LogError(ex, "Error getting sorted ATMs: {Lat}, {Lon}",
                 location.Latitude, location.Longitude);
             return StatusCode(500, new { statusCode = 500, message = "Erro ao buscar caixas automáticos" });
         }
@@ -150,7 +184,7 @@ public class ATMController : ControllerBase
         try
         {
             var atm = await _atmService.GetATMByIdAsync(id);
-            
+
             if (atm == null)
             {
                 return NotFound(new { statusCode = 404, message = "Caixa automático não encontrado" });
@@ -227,7 +261,10 @@ public class ATMController : ControllerBase
         }
     }
 
-    [Authorize]
+    /// <summary>
+    /// Create a new ATM. AllowAnonymous for kudi-cash-find frontend compatibility.
+    /// </summary>
+    [AllowAnonymous]
     [HttpPost]
     public async Task<ActionResult<ATMDto>> CreateATM([FromBody] CreateATMDto dto)
     {
@@ -240,6 +277,29 @@ public class ATMController : ControllerBase
         {
             _logger.LogError(ex, "Error creating ATM");
             return StatusCode(500, new { statusCode = 500, message = "Erro ao criar caixa automático" });
+        }
+    }
+
+    /// <summary>
+    /// Partial update an ATM. AllowAnonymous for kudi-cash-find status updates.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPatch("{id}")]
+    public async Task<ActionResult<FlatATMDto>> PatchATM(string id, [FromBody] UpdateATMDto dto)
+    {
+        try
+        {
+            var atm = await _atmService.PatchATMAsync(id, dto);
+            if (atm == null)
+            {
+                return NotFound(new { statusCode = 404, message = "Caixa automático não encontrado" });
+            }
+            return Ok(atm);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error patching ATM: {Id}", id);
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao atualizar caixa automático" });
         }
     }
 

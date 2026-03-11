@@ -137,7 +137,16 @@ public class ATMRepository : IATMRepository
         return result.DeletedCount > 0;
     }
 
-    // NEW: Add photo to ATM
+    public async Task<List<ATM>> GetAllSortedByUpdatedAsync(int limit = 200)
+    {
+        return await _context.ATMs
+            .Find(_ => true)
+            .SortByDescending(atm => atm.UpdatedAt)
+            .Limit(limit)
+            .ToListAsync();
+    }
+
+    // Add photo to ATM
     public async Task<bool> AddPhotoAsync(string atmId, string photoUrl)
     {
         var filter = Builders<ATM>.Filter.Eq(atm => atm.Id, atmId);

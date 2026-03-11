@@ -5,10 +5,11 @@ public record CreateATMDto(
     string BankName,
     double Latitude,
     double Longitude,
-    string Province,
-    string Municipality,
-    string Street,
-    string Neighborhood,
+    string? LocationName,
+    string? Province,
+    string? Municipality,
+    string? Street,
+    string? Neighborhood,
     string? Landmark,
-    List<string> SupportedServices
+    List<string>? SupportedServices
 );

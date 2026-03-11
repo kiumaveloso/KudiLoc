@@ -21,28 +21,32 @@ public class CreateATMDtoValidator : AbstractValidator<CreateATMDto>
         RuleFor(x => x.Longitude)
             .InclusiveBetween(11.7, 24.1).WithMessage("Longitude deve estar dentro dos limites de Angola (11.7 a 24.1)");
 
+        // Province, Municipality, Street, Neighborhood are now optional for kudi-cash-find
         RuleFor(x => x.Province)
-            .NotEmpty().WithMessage("Província é obrigatória")
-            .Must(BeValidAngolanProvince).WithMessage("Província inválida");
+            .Must(BeValidAngolanProvinceOrNull).WithMessage("Província inválida")
+            .When(x => !string.IsNullOrEmpty(x.Province));
 
         RuleFor(x => x.Municipality)
-            .NotEmpty().WithMessage("Município é obrigatório")
-            .MaximumLength(100);
+            .MaximumLength(100)
+            .When(x => !string.IsNullOrEmpty(x.Municipality));
 
         RuleFor(x => x.Street)
-            .NotEmpty().WithMessage("Rua é obrigatória")
-            .MaximumLength(200);
+            .MaximumLength(200)
+            .When(x => !string.IsNullOrEmpty(x.Street));
 
         RuleFor(x => x.Neighborhood)
-            .NotEmpty().WithMessage("Bairro é obrigatório")
-            .MaximumLength(100);
+            .MaximumLength(100)
+            .When(x => !string.IsNullOrEmpty(x.Neighborhood));
 
-        RuleFor(x => x.SupportedServices)
-            .NotEmpty().WithMessage("Deve ter pelo menos um serviço suportado");
+        RuleFor(x => x.LocationName)
+            .MaximumLength(300).WithMessage("Nome da localização não pode ter mais de 300 caracteres")
+            .When(x => !string.IsNullOrEmpty(x.LocationName));
     }
 
-    private bool BeValidAngolanProvince(string province)
+    private bool BeValidAngolanProvinceOrNull(string? province)
     {
+        if (string.IsNullOrEmpty(province)) return true;
+
         var validProvinces = new[]
         {
             "Bengo", "Benguela", "Bié", "Cabinda", "Cuando Cubango",

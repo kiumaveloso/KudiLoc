@@ -143,18 +143,22 @@ public class ATMControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task CreateATM_WithoutAuth_ReturnsUnauthorized()
+    public async Task CreateATM_WithoutAuth_ReturnsSuccess()
     {
-        // Arrange
+        // Arrange - POST /api/atm is now AllowAnonymous for kudi-cash-find compatibility
+        _factory.MockATMRepository
+            .Setup(r => r.CreateAsync(It.IsAny<ATM>()))
+            .ReturnsAsync((ATM a) => { a.Id = "anon-atm-id"; return a; });
+
         var dto = new CreateATMDto(
-            "New ATM", "BFA", -8.838, 13.234, "Luanda", "Luanda",
+            "New ATM", "BFA", -8.838, 13.234, null, "Luanda", "Luanda",
             "Rua Nova", "Centro", null, new List<string> { "Levantamento" });
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/ATM", dto);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
     [Fact]
@@ -169,7 +173,7 @@ public class ATMControllerTests : IClassFixture<CustomWebApplicationFactory>
             .ReturnsAsync((ATM a) => { a.Id = "new-atm-id"; return a; });
 
         var dto = new CreateATMDto(
-            "New ATM", "BFA", -8.838, 13.234, "Luanda", "Luanda",
+            "New ATM", "BFA", -8.838, 13.234, null, "Luanda", "Luanda",
             "Rua Nova", "Centro", null, new List<string> { "Levantamento" });
 
         // Act

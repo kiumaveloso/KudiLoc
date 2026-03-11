@@ -10,6 +10,8 @@ public interface IStatusReportService
 {
     Task<StatusReportResponseDto> SubmitReportAsync(CreateStatusReportDto dto);
     Task<PagedResultDto<StatusReportResponseDto>> GetRecentReportsAsync(string atmId, int page = 1, int pageSize = 20);
+    Task<List<StatusReportResponseDto>> GetReportsByATMIdFlatAsync(string atmId, int limit = 20);
+    Task<List<StatusReportResponseDto>> GetReportsByCreatorAsync(string createdBy, int limit = 100);
 }
 
 public class StatusReportService : IStatusReportService
@@ -41,24 +43,35 @@ public class StatusReportService : IStatusReportService
             throw new ArgumentException("ATM não encontrado", nameof(dto.ATMId));
         }
 
-        // 2. Verify user exists
-        var user = await _userRepository.GetByIdAsync(dto.UserId);
-        if (user == null)
+        // 2. Resolve HasCash from either the bool field or the StatusReported string
+        bool hasCash = dto.HasCash;
+        if (!string.IsNullOrEmpty(dto.StatusReported))
         {
-            throw new ArgumentException("Utilizador não encontrado", nameof(dto.UserId));
+            hasCash = dto.StatusReported.Equals("has_money", StringComparison.OrdinalIgnoreCase);
         }
 
-        // 3. Check per-user per-ATM report cooldown
-        var cooldown = TimeSpan.FromMinutes(_settings.CooldownMinutes);
-        var lastReport = await _reportRepository.GetLastReportByUserForATM(dto.UserId, dto.ATMId);
-        if (lastReport != null)
+        // 3. Optionally verify user exists (skip for anonymous kudi-cash-find reports)
+        User? user = null;
+        if (!string.IsNullOrEmpty(dto.UserId))
         {
-            var timeSinceLastReport = DateTime.UtcNow - lastReport.ReportedAt;
-            if (timeSinceLastReport < cooldown)
+            user = await _userRepository.GetByIdAsync(dto.UserId);
+            if (user == null)
             {
-                var remainingSeconds = (int)(cooldown - timeSinceLastReport).TotalSeconds;
-                throw new InvalidOperationException(
-                    $"Aguarde {remainingSeconds} segundos antes de submeter outro relatório para este ATM.");
+                throw new ArgumentException("Utilizador não encontrado", nameof(dto.UserId));
+            }
+
+            // Check per-user per-ATM report cooldown
+            var cooldown = TimeSpan.FromMinutes(_settings.CooldownMinutes);
+            var lastReport = await _reportRepository.GetLastReportByUserForATM(dto.UserId, dto.ATMId);
+            if (lastReport != null)
+            {
+                var timeSinceLastReport = DateTime.UtcNow - lastReport.ReportedAt;
+                if (timeSinceLastReport < cooldown)
+                {
+                    var remainingSeconds = (int)(cooldown - timeSinceLastReport).TotalSeconds;
+                    throw new InvalidOperationException(
+                        $"Aguarde {remainingSeconds} segundos antes de submeter outro relatório para este ATM.");
+                }
             }
         }
 
@@ -70,11 +83,13 @@ public class StatusReportService : IStatusReportService
         var report = new StatusReport
         {
             ATMId = dto.ATMId,
-            UserId = dto.UserId,
-            HasCash = dto.HasCash,
+            UserId = dto.UserId ?? string.Empty,
+            HasCash = hasCash,
             OperationalStatus = operationalStatus,
             Notes = dto.Notes,
-            Status = ReportStatus.Pending
+            Status = ReportStatus.Pending,
+            ReporterReputation = dto.ReporterReputation ?? (user?.ReputationScore ?? 50),
+            CreatedBy = dto.CreatedBy
         };
 
         var createdReport = await _reportRepository.CreateAsync(report);
@@ -82,8 +97,16 @@ public class StatusReportService : IStatusReportService
         // 5. Update ATM status based on crowd-sourced data
         await UpdateATMStatusAsync(atm);
 
-        // 6. Update user reputation
-        await UpdateUserReputationAsync(user, createdReport);
+        // 6. Update the ATM's kudi-cash-find tracking fields
+        atm.LastReportTime = createdReport.ReportedAt;
+        atm.RecentReportsCount = atm.CurrentStatus.TotalReports;
+        await _atmRepository.UpdateAsync(atm);
+
+        // 7. Update user reputation (only for authenticated users)
+        if (user != null)
+        {
+            await UpdateUserReputationAsync(user, createdReport);
+        }
 
         return MapToDto(createdReport);
     }
@@ -100,6 +123,18 @@ public class StatusReportService : IStatusReportService
             page, pageSize, (int)totalCount,
             (int)Math.Ceiling(totalCount / (double)pageSize)
         );
+    }
+
+    public async Task<List<StatusReportResponseDto>> GetReportsByATMIdFlatAsync(string atmId, int limit = 20)
+    {
+        var reports = await _reportRepository.GetByATMIdAsync(atmId, limit, 0);
+        return reports.Select(MapToDto).ToList();
+    }
+
+    public async Task<List<StatusReportResponseDto>> GetReportsByCreatorAsync(string createdBy, int limit = 100)
+    {
+        var reports = await _reportRepository.GetByCreatedByAsync(createdBy, limit);
+        return reports.Select(MapToDto).ToList();
     }
 
     private async Task UpdateATMStatusAsync(ATM atm)
@@ -143,6 +178,15 @@ public class StatusReportService : IStatusReportService
         atm.CurrentStatus.LastVerified = DateTime.UtcNow;
         atm.CurrentStatus.TotalReports = recentReports.Count;
 
+        // Sync the IsOnline field for kudi-cash-find compatibility
+        atm.IsOnline = operationalVotes switch
+        {
+            OperationalStatus.Operational => "online",
+            OperationalStatus.Offline => "offline",
+            OperationalStatus.Maintenance => "maintenance",
+            _ => "online"
+        };
+
         await _atmRepository.UpdateAsync(atm);
 
         // Mark reports as verified or rejected
@@ -155,16 +199,21 @@ public class StatusReportService : IStatusReportService
 
         foreach (var report in reports)
         {
-            var user = await _userRepository.GetByIdAsync(report.UserId);
-            if (user != null)
+            if (!string.IsNullOrEmpty(report.UserId))
             {
-                double userWeight = 0.5 + (user.ReputationScore / 100.0);
-                totalWeight += userWeight;
+                var user = await _userRepository.GetByIdAsync(report.UserId);
+                if (user != null)
+                {
+                    double userWeight = 0.5 + (user.ReputationScore / 100.0);
+                    totalWeight += userWeight;
+                    continue;
+                }
             }
-            else
-            {
-                totalWeight += 1.0;
-            }
+
+            // For anonymous reports, use the reporter_reputation from the frontend
+            // or default weight of 1.0
+            double anonWeight = 0.5 + (report.ReporterReputation / 100.0);
+            totalWeight += anonWeight;
         }
 
         return totalWeight;
@@ -222,14 +271,20 @@ public class StatusReportService : IStatusReportService
 
     private StatusReportResponseDto MapToDto(StatusReport report)
     {
+        // Derive the flat status_reported string from HasCash
+        string statusReported = report.HasCash ? "has_money" : "no_money";
+
         return new StatusReportResponseDto(
             report.Id,
             report.ATMId,
-            report.UserId,
+            string.IsNullOrEmpty(report.UserId) ? null : report.UserId,
             report.HasCash,
             report.Notes,
             report.ReportedAt,
-            report.Status.ToString()
+            report.Status.ToString(),
+            statusReported,
+            report.ReporterReputation,
+            report.CreatedBy
         );
     }
 }

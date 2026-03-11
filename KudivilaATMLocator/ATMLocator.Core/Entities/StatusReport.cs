@@ -11,6 +11,10 @@ public class StatusReport
     public int ConfirmationCount { get; set; } // How many users confirmed this
     public DateTime ReportedAt { get; set; }
     public string? Notes { get; set; }
+
+    // kudi-cash-find fields
+    public int ReporterReputation { get; set; } = 50;
+    public string? CreatedBy { get; set; } // user email for anonymous reports
 }
 
 public enum ReportStatus

@@ -23,3 +23,7 @@ logs/
 ## Secrets
 appsettings.*.local.json
 .env
+
+## Frontend
+KudivilaATMLocator/frontend/node_modules/
+KudivilaATMLocator/frontend/dist/

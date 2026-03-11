@@ -19,8 +19,16 @@ public class ATM
     public Address Address { get; set; } = new();
     public ATMStatus CurrentStatus { get; set; } = new();
     public List<string> SupportedServices { get; set; } = new();
-    public List<string> PhotoUrls { get; set; } = new(); // NEW
-    public WorkingHours? WorkingHours { get; set; } // NEW
+    public List<string> PhotoUrls { get; set; } = new();
+    public WorkingHours? WorkingHours { get; set; }
+
+    // kudi-cash-find fields
+    public string LocationName { get; set; } = string.Empty;
+    public string IsOnline { get; set; } = "online";
+    public bool HasPaper { get; set; } = true;
+    public int RecentReportsCount { get; set; } = 0;
+    public DateTime? LastReportTime { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

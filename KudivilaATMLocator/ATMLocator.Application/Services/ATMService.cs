@@ -17,6 +17,11 @@ public interface IATMService
     Task<bool> AddPhotoToATMAsync(string atmId, string photoUrl);
     Task<ATMDto?> UpdateATMAsync(string id, UpdateATMDto dto);
     Task<bool> DeleteATMAsync(string id);
+
+    // kudi-cash-find methods
+    Task<List<FlatATMDto>> GetAllATMsFlatAsync(int limit = 200);
+    Task<FlatATMDto?> GetFlatATMByIdAsync(string id);
+    Task<FlatATMDto?> PatchATMAsync(string id, UpdateATMDto dto);
 }
 
 public class ATMService : IATMService
@@ -40,15 +45,16 @@ public class ATMService : IATMService
             BankName = dto.BankName,
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
-            Province = dto.Province,
-            Municipality = dto.Municipality,
+            LocationName = dto.LocationName ?? string.Empty,
+            Province = dto.Province ?? string.Empty,
+            Municipality = dto.Municipality ?? string.Empty,
             Address = new Address
             {
-                Street = dto.Street,
-                Neighborhood = dto.Neighborhood,
+                Street = dto.Street ?? string.Empty,
+                Neighborhood = dto.Neighborhood ?? string.Empty,
                 Landmark = dto.Landmark ?? string.Empty
             },
-            SupportedServices = dto.SupportedServices,
+            SupportedServices = dto.SupportedServices ?? new List<string>(),
             PhotoUrls = new List<string>(),
             CurrentStatus = new ATMStatus
             {
@@ -137,16 +143,7 @@ public class ATMService : IATMService
         var atm = await _atmRepository.GetByIdAsync(id);
         if (atm == null) return null;
 
-        if (dto.Name != null) atm.Name = dto.Name;
-        if (dto.BankName != null) atm.BankName = dto.BankName;
-        if (dto.Latitude.HasValue) atm.Latitude = dto.Latitude.Value;
-        if (dto.Longitude.HasValue) atm.Longitude = dto.Longitude.Value;
-        if (dto.Province != null) atm.Province = dto.Province;
-        if (dto.Municipality != null) atm.Municipality = dto.Municipality;
-        if (dto.Street != null) atm.Address.Street = dto.Street;
-        if (dto.Neighborhood != null) atm.Address.Neighborhood = dto.Neighborhood;
-        if (dto.Landmark != null) atm.Address.Landmark = dto.Landmark;
-        if (dto.SupportedServices != null) atm.SupportedServices = dto.SupportedServices;
+        ApplyUpdateFields(atm, dto);
 
         var updated = await _atmRepository.UpdateAsync(atm);
         return MapToDto(updated);
@@ -156,6 +153,86 @@ public class ATMService : IATMService
     {
         return await _atmRepository.DeleteAsync(id);
     }
+
+    // --- kudi-cash-find methods ---
+
+    public async Task<List<FlatATMDto>> GetAllATMsFlatAsync(int limit = 200)
+    {
+        var atms = await _atmRepository.GetAllSortedByUpdatedAsync(limit);
+        return atms.Select(MapToFlatDto).ToList();
+    }
+
+    public async Task<FlatATMDto?> GetFlatATMByIdAsync(string id)
+    {
+        var atm = await _atmRepository.GetByIdAsync(id);
+        return atm == null ? null : MapToFlatDto(atm);
+    }
+
+    public async Task<FlatATMDto?> PatchATMAsync(string id, UpdateATMDto dto)
+    {
+        var atm = await _atmRepository.GetByIdAsync(id);
+        if (atm == null) return null;
+
+        ApplyUpdateFields(atm, dto);
+
+        var updated = await _atmRepository.UpdateAsync(atm);
+        return MapToFlatDto(updated);
+    }
+
+    // --- Shared update logic ---
+
+    private void ApplyUpdateFields(ATM atm, UpdateATMDto dto)
+    {
+        if (dto.Name != null) atm.Name = dto.Name;
+        if (dto.BankName != null) atm.BankName = dto.BankName;
+        if (dto.Latitude.HasValue) atm.Latitude = dto.Latitude.Value;
+        if (dto.Longitude.HasValue) atm.Longitude = dto.Longitude.Value;
+        if (dto.LocationName != null) atm.LocationName = dto.LocationName;
+        if (dto.Province != null) atm.Province = dto.Province;
+        if (dto.Municipality != null) atm.Municipality = dto.Municipality;
+        if (dto.Street != null) atm.Address.Street = dto.Street;
+        if (dto.Neighborhood != null) atm.Address.Neighborhood = dto.Neighborhood;
+        if (dto.Landmark != null) atm.Address.Landmark = dto.Landmark;
+        if (dto.SupportedServices != null) atm.SupportedServices = dto.SupportedServices;
+
+        // kudi-cash-find status fields
+        if (dto.Status != null)
+        {
+            // Map flat status string to internal HasCash + ReliabilityScore
+            switch (dto.Status.ToLowerInvariant())
+            {
+                case "has_money":
+                    atm.CurrentStatus.HasCash = true;
+                    break;
+                case "no_money":
+                    atm.CurrentStatus.HasCash = false;
+                    break;
+                case "uncertain":
+                    atm.CurrentStatus.HasCash = false;
+                    atm.CurrentStatus.ReliabilityScore = 0;
+                    break;
+            }
+        }
+
+        if (dto.IsOnline != null)
+        {
+            atm.IsOnline = dto.IsOnline;
+            // Also sync to the enum-based OperationalStatus
+            atm.CurrentStatus.OperationalStatus = dto.IsOnline.ToLowerInvariant() switch
+            {
+                "online" => OperationalStatus.Operational,
+                "offline" => OperationalStatus.Offline,
+                "maintenance" => OperationalStatus.Maintenance,
+                _ => atm.CurrentStatus.OperationalStatus
+            };
+        }
+
+        if (dto.HasPaper.HasValue) atm.HasPaper = dto.HasPaper.Value;
+        if (dto.LastReportTime.HasValue) atm.LastReportTime = dto.LastReportTime.Value;
+        if (dto.RecentReportsCount.HasValue) atm.RecentReportsCount = dto.RecentReportsCount.Value;
+    }
+
+    // --- Mapping ---
 
     private ATMDto MapToDto(ATM atm)
     {
@@ -184,6 +261,48 @@ public class ATMService : IATMService
             ),
             atm.SupportedServices,
             atm.PhotoUrls
+        );
+    }
+
+    /// <summary>
+    /// Maps an ATM entity to the flat DTO format expected by kudi-cash-find frontend.
+    /// </summary>
+    private FlatATMDto MapToFlatDto(ATM atm)
+    {
+        // Derive the flat "status" string from internal HasCash + ReliabilityScore
+        string status;
+        if (atm.CurrentStatus.HasCash)
+            status = "has_money";
+        else if (atm.CurrentStatus.ReliabilityScore == 0 && atm.CurrentStatus.TotalReports == 0)
+            status = "uncertain";
+        else
+            status = "no_money";
+
+        // Derive "is_online" from the OperationalStatus enum, preferring the stored IsOnline
+        // string if it was explicitly set by the frontend
+        string isOnline = !string.IsNullOrEmpty(atm.IsOnline) && atm.IsOnline != "online"
+            ? atm.IsOnline
+            : atm.CurrentStatus.OperationalStatus switch
+            {
+                OperationalStatus.Operational => "online",
+                OperationalStatus.Offline => "offline",
+                OperationalStatus.Maintenance => "maintenance",
+                _ => "online"
+            };
+
+        return new FlatATMDto(
+            atm.Id,
+            atm.BankName,
+            !string.IsNullOrEmpty(atm.LocationName) ? atm.LocationName : atm.Name,
+            atm.Latitude,
+            atm.Longitude,
+            status,
+            isOnline,
+            atm.HasPaper,
+            atm.CurrentStatus.ReliabilityScore,
+            atm.RecentReportsCount,
+            atm.LastReportTime,
+            atm.UpdatedAt
         );
     }
 
