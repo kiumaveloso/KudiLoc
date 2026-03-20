@@ -19,4 +19,6 @@ public interface IATMRepository
     Task<bool> DeleteAsync(string id);
     Task<bool> AddPhotoAsync(string atmId, string photoUrl);
     Task<List<ATM>> GetAllSortedByUpdatedAsync(int limit = 200);
+    Task<List<ATM>> GetAllSortedByUpdatedPagedAsync(int skip, int limit);
+    Task<long> CountByCreatedByAsync(string userId);
 }

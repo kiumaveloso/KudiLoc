@@ -1,7 +1,9 @@
 using ATMLocator.Application.DTOs;
 using ATMLocator.Application.Services;
+using ATMLocator.API.Hubs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Asp.Versioning;
 
 namespace ATMLocator.API.Controllers;
@@ -13,13 +15,16 @@ namespace ATMLocator.API.Controllers;
 public class StatusReportController : ControllerBase
 {
     private readonly IStatusReportService _reportService;
+    private readonly IHubContext<ATMStatusHub> _hubContext;
     private readonly ILogger<StatusReportController> _logger;
 
     public StatusReportController(
         IStatusReportService reportService,
+        IHubContext<ATMStatusHub> hubContext,
         ILogger<StatusReportController> logger)
     {
         _reportService = reportService;
+        _hubContext = hubContext;
         _logger = logger;
     }
 
@@ -34,7 +39,10 @@ public class StatusReportController : ControllerBase
     {
         try
         {
-            var report = await _reportService.SubmitReportAsync(dto);
+            var report = await _reportService.SubmitReportAsync(dto, async (atmId, payload) =>
+            {
+                await _hubContext.Clients.Group($"atm-{atmId}").SendAsync("ATMStatusUpdated", payload);
+            });
             return Ok(new
             {
                 message = "Relatório submetido com sucesso! Obrigado por ajudar a comunidade.",

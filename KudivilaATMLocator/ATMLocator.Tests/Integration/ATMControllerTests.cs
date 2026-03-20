@@ -152,7 +152,7 @@ public class ATMControllerTests : IClassFixture<CustomWebApplicationFactory>
 
         var dto = new CreateATMDto(
             "New ATM", "BFA", -8.838, 13.234, null, "Luanda", "Luanda",
-            "Rua Nova", "Centro", null, new List<string> { "Levantamento" });
+            "Rua Nova", "Centro", null, new List<string> { "Levantamento" }, null);
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/ATM", dto);
@@ -174,7 +174,7 @@ public class ATMControllerTests : IClassFixture<CustomWebApplicationFactory>
 
         var dto = new CreateATMDto(
             "New ATM", "BFA", -8.838, 13.234, null, "Luanda", "Luanda",
-            "Rua Nova", "Centro", null, new List<string> { "Levantamento" });
+            "Rua Nova", "Centro", null, new List<string> { "Levantamento" }, null);
 
         // Act
         var response = await _client.PostAsJsonAsync("/api/ATM", dto);

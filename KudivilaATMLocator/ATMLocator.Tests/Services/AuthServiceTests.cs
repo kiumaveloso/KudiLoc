@@ -11,20 +11,23 @@ namespace ATMLocator.Tests;
 public class AuthServiceTests
 {
     private readonly Mock<IUserRepository> _mockRepo;
+    private readonly Mock<IRefreshTokenRepository> _mockRefreshTokenRepo;
     private readonly JwtSettings _jwtSettings;
     private readonly AuthService _service;
 
     public AuthServiceTests()
     {
         _mockRepo = new Mock<IUserRepository>();
+        _mockRefreshTokenRepo = new Mock<IRefreshTokenRepository>();
         _jwtSettings = new JwtSettings
         {
             Key = "ThisIsAVerySecretKeyThatIs32CharsLong!",
             Issuer = "KudividaAPI",
             Audience = "KudividaApp",
-            ExpirationDays = 30
+            ExpirationDays = 30,
+            AccessTokenMinutes = 15
         };
-        _service = new AuthService(_mockRepo.Object, _jwtSettings);
+        _service = new AuthService(_mockRepo.Object, _mockRefreshTokenRepo.Object, _jwtSettings);
     }
 
     [Fact]

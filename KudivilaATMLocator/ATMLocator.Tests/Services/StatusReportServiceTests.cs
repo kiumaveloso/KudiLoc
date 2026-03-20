@@ -15,6 +15,7 @@ public class StatusReportServiceTests
     private readonly Mock<IStatusReportRepository> _mockReportRepo;
     private readonly Mock<IATMRepository> _mockAtmRepo;
     private readonly Mock<IUserRepository> _mockUserRepo;
+    private readonly Mock<IBadgeService> _mockBadgeService;
     private readonly StatusReportService _service;
 
     public StatusReportServiceTests()
@@ -22,12 +23,14 @@ public class StatusReportServiceTests
         _mockReportRepo = new Mock<IStatusReportRepository>();
         _mockAtmRepo = new Mock<IATMRepository>();
         _mockUserRepo = new Mock<IUserRepository>();
+        _mockBadgeService = new Mock<IBadgeService>();
         var settings = Options.Create(new ReportSettings());
 
         _service = new StatusReportService(
             _mockReportRepo.Object,
             _mockAtmRepo.Object,
             _mockUserRepo.Object,
+            _mockBadgeService.Object,
             settings
         );
     }

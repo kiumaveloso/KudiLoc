@@ -55,6 +55,24 @@ public class MongoDbContext
     public IMongoCollection<User> Users =>
         _database.GetCollection<User>(_settings.UsersCollectionName);
 
+    public IMongoCollection<Comment> Comments =>
+        _database.GetCollection<Comment>(_settings.CommentsCollectionName);
+
+    public IMongoCollection<Badge> Badges =>
+        _database.GetCollection<Badge>(_settings.BadgesCollectionName);
+
+    public IMongoCollection<VisitHistory> VisitHistory =>
+        _database.GetCollection<VisitHistory>(_settings.VisitHistoryCollectionName);
+
+    public IMongoCollection<RefreshToken> RefreshTokens =>
+        _database.GetCollection<RefreshToken>(_settings.RefreshTokensCollectionName);
+
+    public IMongoCollection<OtpEntry> OtpEntries =>
+        _database.GetCollection<OtpEntry>(_settings.OtpCollectionName);
+
+    public IMongoCollection<LoginAudit> LoginAudits =>
+        _database.GetCollection<LoginAudit>(_settings.LoginAuditsCollectionName);
+
     /// <summary>
     /// Creates required MongoDB indexes. Called during application startup
     /// rather than in the constructor to avoid blocking DI resolution when
@@ -88,12 +106,78 @@ public class MongoDbContext
                 .Descending(report => report.ReportedAt);
             await StatusReports.Indexes.CreateOneAsync(new CreateIndexModel<StatusReport>(reportAtmIndex));
 
-            // Index for user phone numbers (unique)
-            var userPhoneIndex = Builders<User>.IndexKeys
-                .Ascending(user => user.PhoneNumber);
-            await Users.Indexes.CreateOneAsync(new CreateIndexModel<User>(
-                userPhoneIndex,
+            // NOTE: the old plain-text PhoneNumber unique index is intentionally omitted.
+            // PhoneNumber is empty after encryption; uniqueness is enforced via PhoneNumberHash below.
+
+            // Index for comments by ATM
+            var commentAtmIndex = Builders<Comment>.IndexKeys
+                .Ascending(c => c.ATMId);
+            await Comments.Indexes.CreateOneAsync(new CreateIndexModel<Comment>(commentAtmIndex));
+
+            // Compound unique index for badges (one badge type per user)
+            var badgeUserTypeIndex = Builders<Badge>.IndexKeys
+                .Ascending(b => b.UserId)
+                .Ascending(b => b.BadgeType);
+            await Badges.Indexes.CreateOneAsync(new CreateIndexModel<Badge>(
+                badgeUserTypeIndex,
                 new CreateIndexOptions { Unique = true }
+            ));
+
+            // Index for visit history by user
+            var visitUserIndex = Builders<VisitHistory>.IndexKeys
+                .Ascending(v => v.UserId);
+            await VisitHistory.Indexes.CreateOneAsync(new CreateIndexModel<VisitHistory>(visitUserIndex));
+
+            // TTL index on refresh tokens (auto-delete after ExpiresAt)
+            var refreshTokenTtlIndex = Builders<RefreshToken>.IndexKeys
+                .Ascending(rt => rt.ExpiresAt);
+            await RefreshTokens.Indexes.CreateOneAsync(new CreateIndexModel<RefreshToken>(
+                refreshTokenTtlIndex,
+                new CreateIndexOptions { ExpireAfter = TimeSpan.Zero }
+            ));
+
+            // Index for refresh token lookup by token string
+            var refreshTokenIndex = Builders<RefreshToken>.IndexKeys
+                .Ascending(rt => rt.Token);
+            await RefreshTokens.Indexes.CreateOneAsync(new CreateIndexModel<RefreshToken>(refreshTokenIndex));
+
+            // TTL index on OTP entries (auto-delete after ExpiresAt)
+            var otpTtlIndex = Builders<OtpEntry>.IndexKeys
+                .Ascending(o => o.ExpiresAt);
+            await OtpEntries.Indexes.CreateOneAsync(new CreateIndexModel<OtpEntry>(
+                otpTtlIndex,
+                new CreateIndexOptions { ExpireAfter = TimeSpan.Zero }
+            ));
+
+            // Unique index on OTP phone number
+            var otpPhoneIndex = Builders<OtpEntry>.IndexKeys
+                .Ascending(o => o.PhoneNumber);
+            await OtpEntries.Indexes.CreateOneAsync(new CreateIndexModel<OtpEntry>(
+                otpPhoneIndex,
+                new CreateIndexOptions { Unique = true }
+            ));
+
+            // TTL index on login audits (auto-delete after 90 days)
+            var auditTtlIndex = Builders<LoginAudit>.IndexKeys
+                .Ascending(a => a.CreatedAt);
+            await LoginAudits.Indexes.CreateOneAsync(new CreateIndexModel<LoginAudit>(
+                auditTtlIndex,
+                new CreateIndexOptions { ExpireAfter = TimeSpan.FromDays(90) }
+            ));
+
+            // Index for fast brute-force check: phoneNumberHash + success + createdAt
+            var auditBruteForceIndex = Builders<LoginAudit>.IndexKeys
+                .Ascending(a => a.PhoneNumberHash)
+                .Ascending(a => a.Success)
+                .Descending(a => a.CreatedAt);
+            await LoginAudits.Indexes.CreateOneAsync(new CreateIndexModel<LoginAudit>(auditBruteForceIndex));
+
+            // Index for phone number hash lookup on users
+            var userPhoneHashIndex = Builders<User>.IndexKeys
+                .Ascending(u => u.PhoneNumberHash);
+            await Users.Indexes.CreateOneAsync(new CreateIndexModel<User>(
+                userPhoneHashIndex,
+                new CreateIndexOptions { Unique = true, Sparse = true }
             ));
 
             _indexesCreated = true;

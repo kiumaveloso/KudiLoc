@@ -163,7 +163,8 @@ public class ATMServiceTests
             "Rua Principal",
             "Talatona",
             "Shopping Xyami",
-            new List<string> { "Levantamento", "Depósito" }
+            new List<string> { "Levantamento", "Depósito" },
+            null
         );
 
         _mockRepo.Setup(r => r.CreateAsync(It.IsAny<ATM>()))

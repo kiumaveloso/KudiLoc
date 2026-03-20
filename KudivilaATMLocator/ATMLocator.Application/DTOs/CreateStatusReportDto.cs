@@ -8,5 +8,7 @@ public record CreateStatusReportDto(
     string? OperationalStatus,
     string? Notes,
     int? ReporterReputation,
-    string? CreatedBy
+    string? CreatedBy,
+    double? Latitude = null,
+    double? Longitude = null
 );

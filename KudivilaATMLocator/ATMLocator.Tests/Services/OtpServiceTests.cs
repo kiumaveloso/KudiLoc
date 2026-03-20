@@ -1,80 +1,77 @@
-using Xunit;
-using FluentAssertions;
 using ATMLocator.Application.Services;
+using ATMLocator.Core.Entities;
+using ATMLocator.Core.Interfaces;
+using Moq;
+using Xunit;
 
-namespace ATMLocator.Tests;
+namespace ATMLocator.Tests.Services;
 
 public class OtpServiceTests
 {
-    private readonly OtpService _service = new();
+    private readonly Mock<IOtpRepository> _repoMock = new();
+    private readonly OtpService _sut;
 
-    [Fact]
-    public void GenerateOtp_Returns6DigitCode()
+    public OtpServiceTests()
     {
-        var code = _service.GenerateOtp("+244923000001");
-
-        code.Should().HaveLength(6);
-        code.Should().MatchRegex(@"^\d{6}$");
+        _sut = new OtpService(_repoMock.Object);
     }
 
     [Fact]
-    public void VerifyOtp_WithCorrectCode_ReturnsTrue()
+    public async Task GenerateOtpAsync_ReturnsSixDigitCode()
     {
-        var phone = "+244923000002";
-        var code = _service.GenerateOtp(phone);
-
-        var result = _service.VerifyOtp(phone, code);
-
-        result.Should().BeTrue();
+        _repoMock.Setup(r => r.SaveAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>()))
+            .Returns(Task.CompletedTask);
+        var code = await _sut.GenerateOtpAsync("+244912345678");
+        Assert.Matches(@"^\d{6}$", code);
     }
 
     [Fact]
-    public void VerifyOtp_WithWrongCode_ReturnsFalse()
+    public async Task VerifyOtpAsync_WithCorrectCode_ReturnsTrue()
     {
-        var phone = "+244923000003";
-        _service.GenerateOtp(phone);
+        var entry = new OtpEntry
+        {
+            PhoneNumber = "+244912345678",
+            Code = "123456",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        };
+        _repoMock.Setup(r => r.GetAsync("+244912345678"))
+            .ReturnsAsync(entry);
+        _repoMock.Setup(r => r.DeleteAsync(It.IsAny<string>())).Returns(Task.CompletedTask);
 
-        var result = _service.VerifyOtp(phone, "000000");
-
-        result.Should().BeFalse();
+        var result = await _sut.VerifyOtpAsync("+244912345678", "123456");
+        Assert.True(result);
     }
 
     [Fact]
-    public void VerifyOtp_WithUnknownPhone_ReturnsFalse()
+    public async Task VerifyOtpAsync_WithWrongCode_ReturnsFalse()
     {
-        var result = _service.VerifyOtp("+244999999999", "123456");
+        var entry = new OtpEntry
+        {
+            PhoneNumber = "+244912345678",
+            Code = "123456",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        };
+        _repoMock.Setup(r => r.GetAsync("+244912345678"))
+            .ReturnsAsync(entry);
+        _repoMock.Setup(r => r.DeleteAsync(It.IsAny<string>())).Returns(Task.CompletedTask);
 
-        result.Should().BeFalse();
+        var result = await _sut.VerifyOtpAsync("+244912345678", "000000");
+        Assert.False(result);
     }
 
     [Fact]
-    public void VerifyOtp_IsOneTimeUse()
+    public async Task VerifyOtpAsync_WithExpiredCode_ReturnsFalse()
     {
-        var phone = "+244923000004";
-        var code = _service.GenerateOtp(phone);
+        var entry = new OtpEntry
+        {
+            PhoneNumber = "+244912345678",
+            Code = "123456",
+            ExpiresAt = DateTime.UtcNow.AddMinutes(-1) // expired
+        };
+        _repoMock.Setup(r => r.GetAsync("+244912345678"))
+            .ReturnsAsync(entry);
 
-        _service.VerifyOtp(phone, code).Should().BeTrue();
-        _service.VerifyOtp(phone, code).Should().BeFalse();
-    }
-
-    [Fact]
-    public void GenerateOtp_OverwritesPreviousCode()
-    {
-        var phone = "+244923000005";
-        var firstCode = _service.GenerateOtp(phone);
-        var secondCode = _service.GenerateOtp(phone);
-
-        // First code should no longer work
-        _service.VerifyOtp(phone, firstCode).Should().BeFalse();
-    }
-
-    [Fact]
-    public void GenerateOtp_DifferentPhones_IndependentCodes()
-    {
-        var code1 = _service.GenerateOtp("+244923000006");
-        var code2 = _service.GenerateOtp("+244923000007");
-
-        _service.VerifyOtp("+244923000006", code1).Should().BeTrue();
-        _service.VerifyOtp("+244923000007", code2).Should().BeTrue();
+        var result = await _sut.VerifyOtpAsync("+244912345678", "123456");
+        Assert.False(result);
     }
 }

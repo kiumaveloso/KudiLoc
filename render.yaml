@@ -22,3 +22,15 @@ services:
         value: KudiLoc
       - key: Jwt__ExpirationDays
         value: "7"
+      - key: Cloudinary__CloudName
+        sync: false  # Set manually in Render dashboard
+      - key: Cloudinary__ApiKey
+        sync: false
+      - key: Cloudinary__ApiSecret
+        sync: false
+      - key: AfricasTalking__ApiKey
+        sync: false  # Set manually in Render dashboard
+      - key: AfricasTalking__Username
+        sync: false  # Set manually in Render dashboard
+      - key: AfricasTalking__SenderId
+        value: KudiLoc

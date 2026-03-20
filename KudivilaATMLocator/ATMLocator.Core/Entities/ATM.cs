@@ -29,6 +29,8 @@ public class ATM
     public int RecentReportsCount { get; set; } = 0;
     public DateTime? LastReportTime { get; set; }
 
+    public string CreatedBy { get; set; } = string.Empty;
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -82,11 +84,13 @@ public enum OperationalStatus
     Offline
 }
 
-// NEW: Working hours
 public class WorkingHours
 {
-    public bool Is24Hours { get; set; }
-    public string? OpenTime { get; set; } // "08:00"
-    public string? CloseTime { get; set; } // "22:00"
-    public List<string> ClosedDays { get; set; } = new(); // ["Sunday"]
+    /// <summary>Opening time in HH:mm format, e.g. "08:00"</summary>
+    public string? Opens { get; set; }
+    /// <summary>Closing time in HH:mm format, e.g. "17:00"</summary>
+    public string? Closes { get; set; }
+    /// <summary>Days open: 0=Sun, 1=Mon, ..., 6=Sat</summary>
+    public List<int> DaysOpen { get; set; } = [];
+    public bool IsOpen24Hours { get; set; }
 }

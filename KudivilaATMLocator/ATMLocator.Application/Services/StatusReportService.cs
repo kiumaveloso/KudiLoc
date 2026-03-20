@@ -6,9 +6,15 @@ using Microsoft.Extensions.Options;
 
 namespace ATMLocator.Application.Services;
 
+/// <summary>
+/// Callback invoked after ATM status is updated so the API layer can broadcast via SignalR
+/// without creating a direct dependency on Microsoft.AspNetCore.SignalR in the Application layer.
+/// </summary>
+public delegate Task ATMStatusUpdatedCallback(string atmId, object statusPayload);
+
 public interface IStatusReportService
 {
-    Task<StatusReportResponseDto> SubmitReportAsync(CreateStatusReportDto dto);
+    Task<StatusReportResponseDto> SubmitReportAsync(CreateStatusReportDto dto, ATMStatusUpdatedCallback? onStatusUpdated = null);
     Task<PagedResultDto<StatusReportResponseDto>> GetRecentReportsAsync(string atmId, int page = 1, int pageSize = 20);
     Task<List<StatusReportResponseDto>> GetReportsByATMIdFlatAsync(string atmId, int limit = 20);
     Task<List<StatusReportResponseDto>> GetReportsByCreatorAsync(string createdBy, int limit = 100);
@@ -20,27 +26,39 @@ public class StatusReportService : IStatusReportService
     private readonly IStatusReportRepository _reportRepository;
     private readonly IATMRepository _atmRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IBadgeService _badgeService;
     private readonly ReportSettings _settings;
 
     public StatusReportService(
         IStatusReportRepository reportRepository,
         IATMRepository atmRepository,
         IUserRepository userRepository,
+        IBadgeService badgeService,
         IOptions<ReportSettings> settings)
     {
         _reportRepository = reportRepository;
         _atmRepository = atmRepository;
         _userRepository = userRepository;
+        _badgeService = badgeService;
         _settings = settings.Value;
     }
 
-    public async Task<StatusReportResponseDto> SubmitReportAsync(CreateStatusReportDto dto)
+    public async Task<StatusReportResponseDto> SubmitReportAsync(CreateStatusReportDto dto, ATMStatusUpdatedCallback? onStatusUpdated = null)
     {
         // 1. Verify ATM exists
         var atm = await _atmRepository.GetByIdAsync(dto.ATMId);
         if (atm == null)
         {
             throw new ArgumentException("ATM não encontrado", nameof(dto.ATMId));
+        }
+
+        // 1b. Geographic validation: reporter must be within 2 km of the ATM
+        if (dto.Latitude.HasValue && dto.Longitude.HasValue &&
+            dto.Latitude.Value != 0 && dto.Longitude.Value != 0)
+        {
+            var distance = HaversineKm(dto.Latitude.Value, dto.Longitude.Value, atm.Latitude, atm.Longitude);
+            if (distance > 2.0)
+                throw new InvalidOperationException("Localização demasiado distante do ATM. Tem de estar perto para reportar.");
         }
 
         // 2. Resolve HasCash from either the bool field or the StatusReported string
@@ -102,10 +120,27 @@ public class StatusReportService : IStatusReportService
         atm.RecentReportsCount = atm.CurrentStatus.TotalReports;
         await _atmRepository.UpdateAsync(atm);
 
-        // 7. Update user reputation (only for authenticated users)
+        // 7. Broadcast status update via SignalR (if callback provided by API layer)
+        if (onStatusUpdated != null)
+        {
+            var payload = new
+            {
+                atm_id = atm.Id,
+                has_cash = atm.CurrentStatus.HasCash,
+                reliability_score = atm.CurrentStatus.ReliabilityScore,
+                last_verified = atm.CurrentStatus.LastVerified,
+                total_reports = atm.CurrentStatus.TotalReports,
+                operational_status = atm.CurrentStatus.OperationalStatus.ToString().ToLowerInvariant(),
+                is_online = atm.IsOnline
+            };
+            await onStatusUpdated(atm.Id, payload);
+        }
+
+        // 8. Update user reputation and check badge eligibility (only for authenticated users)
         if (user != null)
         {
             await UpdateUserReputationAsync(user, createdReport);
+            await _badgeService.CheckAndAwardBadgesAsync(user.Id);
         }
 
         return MapToDto(createdReport);
@@ -151,9 +186,20 @@ public class StatusReportService : IStatusReportService
         var hasCashReports = recentReports.Where(r => r.HasCash).ToList();
         var noCashReports = recentReports.Where(r => !r.HasCash).ToList();
 
+        // Batch-load all users referenced by reports to avoid N+1 queries
+        var allUserIds = recentReports
+            .Where(r => !string.IsNullOrEmpty(r.UserId))
+            .Select(r => r.UserId)
+            .Distinct()
+            .ToList();
+        var users = allUserIds.Count > 0
+            ? await _userRepository.GetByIdsAsync(allUserIds)
+            : new List<User>();
+        var userMap = users.ToDictionary(u => u.Id);
+
         // Weight reports by user reputation
-        var hasCashWeight = await CalculateReportWeight(hasCashReports);
-        var noCashWeight = await CalculateReportWeight(noCashReports);
+        var hasCashWeight = CalculateReportWeight(hasCashReports, userMap);
+        var noCashWeight = CalculateReportWeight(noCashReports, userMap);
 
         // Determine ATM status based on weighted reports
         bool hasMoneyNow = hasCashWeight > noCashWeight;
@@ -193,21 +239,17 @@ public class StatusReportService : IStatusReportService
         await UpdateReportStatuses(recentReports, hasMoneyNow);
     }
 
-    private async Task<double> CalculateReportWeight(List<StatusReport> reports)
+    private static double CalculateReportWeight(List<StatusReport> reports, Dictionary<string, User> userMap)
     {
         double totalWeight = 0;
 
         foreach (var report in reports)
         {
-            if (!string.IsNullOrEmpty(report.UserId))
+            if (!string.IsNullOrEmpty(report.UserId) && userMap.TryGetValue(report.UserId, out var user))
             {
-                var user = await _userRepository.GetByIdAsync(report.UserId);
-                if (user != null)
-                {
-                    double userWeight = 0.5 + (user.ReputationScore / 100.0);
-                    totalWeight += userWeight;
-                    continue;
-                }
+                double userWeight = 0.5 + (user.ReputationScore / 100.0);
+                totalWeight += userWeight;
+                continue;
             }
 
             // For anonymous reports, use the reporter_reputation from the frontend
@@ -217,6 +259,18 @@ public class StatusReportService : IStatusReportService
         }
 
         return totalWeight;
+    }
+
+    private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371.0; // Earth radius in km
+        var dLat = (lat2 - lat1) * Math.PI / 180.0;
+        var dLon = (lon2 - lon1) * Math.PI / 180.0;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        return R * c;
     }
 
     private int CalculateReliabilityScore(int totalReports, double winningWeight, int winningCount)

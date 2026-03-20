@@ -146,6 +146,21 @@ public class ATMRepository : IATMRepository
             .ToListAsync();
     }
 
+    public async Task<List<ATM>> GetAllSortedByUpdatedPagedAsync(int skip, int limit)
+    {
+        return await _context.ATMs
+            .Find(_ => true)
+            .SortByDescending(atm => atm.UpdatedAt)
+            .Skip(skip)
+            .Limit(limit)
+            .ToListAsync();
+    }
+
+    public async Task<long> CountByCreatedByAsync(string userId)
+    {
+        return await _context.ATMs.CountDocumentsAsync(atm => atm.CreatedBy == userId);
+    }
+
     // Add photo to ATM
     public async Task<bool> AddPhotoAsync(string atmId, string photoUrl)
     {

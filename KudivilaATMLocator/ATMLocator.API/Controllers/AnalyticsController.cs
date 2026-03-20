@@ -1,5 +1,6 @@
 using ATMLocator.Application.DTOs;
 using ATMLocator.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
 
@@ -23,6 +24,7 @@ public class AnalyticsController : ControllerBase
     /// <summary>
     /// Get overall system statistics
     /// </summary>
+    [Authorize(Roles = "admin")]
     [ResponseCache(Duration = 60)]
     [HttpGet("stats")]
     public async Task<ActionResult<SystemStatsDto>> GetSystemStats()

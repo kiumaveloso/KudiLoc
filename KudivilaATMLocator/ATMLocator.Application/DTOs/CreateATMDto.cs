@@ -1,3 +1,5 @@
+using ATMLocator.Core.Entities;
+
 namespace ATMLocator.Application.DTOs;
 
 public record CreateATMDto(
@@ -11,5 +13,6 @@ public record CreateATMDto(
     string? Street,
     string? Neighborhood,
     string? Landmark,
-    List<string>? SupportedServices
+    List<string>? SupportedServices,
+    WorkingHours? WorkingHours
 );

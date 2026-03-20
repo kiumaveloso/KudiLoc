@@ -1,37 +1,42 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using ATMLocator.Core.Interfaces;
 
 namespace ATMLocator.Application.Services;
 
 public interface IOtpService
 {
-    string GenerateOtp(string phoneNumber);
-    bool VerifyOtp(string phoneNumber, string otpCode);
+    Task<string> GenerateOtpAsync(string phoneNumber);
+    Task<bool> VerifyOtpAsync(string phoneNumber, string otpCode);
 }
 
 public class OtpService : IOtpService
 {
-    private readonly ConcurrentDictionary<string, OtpEntry> _otpStore = new();
-    private static readonly TimeSpan OtpExpiration = TimeSpan.FromMinutes(5);
+    private readonly IOtpRepository _otpRepository;
 
-    public string GenerateOtp(string phoneNumber)
+    public OtpService(IOtpRepository otpRepository)
+    {
+        _otpRepository = otpRepository;
+    }
+
+    public async Task<string> GenerateOtpAsync(string phoneNumber)
     {
         var code = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
-        var entry = new OtpEntry(code, DateTime.UtcNow.Add(OtpExpiration));
-        _otpStore.AddOrUpdate(phoneNumber, entry, (_, _) => entry);
+        await _otpRepository.SaveAsync(phoneNumber, code, DateTime.UtcNow.AddMinutes(5));
         return code;
     }
 
-    public bool VerifyOtp(string phoneNumber, string otpCode)
+    public async Task<bool> VerifyOtpAsync(string phoneNumber, string otpCode)
     {
-        if (!_otpStore.TryRemove(phoneNumber, out var entry))
+        var entry = await _otpRepository.GetAsync(phoneNumber);
+
+        if (entry == null)
             return false;
 
         if (DateTime.UtcNow > entry.ExpiresAt)
             return false;
 
+        await _otpRepository.DeleteAsync(phoneNumber);
+
         return entry.Code == otpCode;
     }
-
-    private record OtpEntry(string Code, DateTime ExpiresAt);
 }

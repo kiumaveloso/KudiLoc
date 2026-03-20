@@ -35,13 +35,15 @@ public class ATMController : ControllerBase
 
     /// <summary>
     /// List all ATMs in flat format for kudi-cash-find frontend.
-    /// Supports ?id= filter, ?sort= and ?limit= query params.
+    /// Supports ?id= filter, ?sort=, ?limit=, ?page= and ?pageSize= query params.
     /// </summary>
     [HttpGet]
     public async Task<ActionResult<List<FlatATMDto>>> GetAllATMs(
         [FromQuery] string? sort = "-updated_date",
         [FromQuery] int limit = 200,
-        [FromQuery] string? id = null)
+        [FromQuery] string? id = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
     {
         try
         {
@@ -56,9 +58,20 @@ public class ATMController : ControllerBase
                 return Ok(new List<FlatATMDto> { singleAtm });
             }
 
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            page = Math.Max(1, page);
             limit = Math.Clamp(limit, 1, 500);
-            var atms = await _atmService.GetAllATMsFlatAsync(limit);
-            return Ok(atms);
+
+            // Use the smaller of limit and pageSize for actual page size
+            var effectivePageSize = Math.Min(limit, pageSize);
+            var skip = (page - 1) * effectivePageSize;
+
+            var result = await _atmService.GetAllATMsFlatPagedAsync(skip, effectivePageSize);
+            Response.Headers["X-Total-Count"] = result.TotalCount.ToString();
+            Response.Headers["X-Page"] = page.ToString();
+            Response.Headers["X-Page-Size"] = effectivePageSize.ToString();
+
+            return Ok(result.Items);
         }
         catch (Exception ex)
         {

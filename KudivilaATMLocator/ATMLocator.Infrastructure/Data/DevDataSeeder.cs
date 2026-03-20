@@ -172,7 +172,7 @@ public static class DevDataSeeder
             },
             SupportedServices = services,
             PhotoUrls = [],
-            WorkingHours = new WorkingHours { Is24Hours = true },
+            WorkingHours = new WorkingHours { IsOpen24Hours = true },
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -193,6 +193,7 @@ public static class DevDataSeeder
                 ReputationScore = 100,
                 TotalReports = 25,
                 AccurateReports = 22,
+                Role = "admin",
                 CreatedAt = now
             },
             new User

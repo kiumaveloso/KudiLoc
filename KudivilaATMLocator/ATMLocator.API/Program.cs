@@ -1,6 +1,7 @@
 using System.Text;
 using AspNetCoreRateLimit;
 using ATMLocator.Application.Services;
+using ATMLocator.Infrastructure.Services;
 using Serilog;
 using ATMLocator.Application.Validators;
 using ATMLocator.Core.Interfaces;
@@ -11,6 +12,7 @@ using ATMLocator.Infrastructure.Repositories;
 using ATMLocator.API.Middleware;
 using ATMLocator.API.Services;
 using ATMLocator.API.HealthChecks;
+using ATMLocator.API.Hubs;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -89,9 +91,21 @@ var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT settings are not configured in appsettings.json");
 builder.Services.AddSingleton(jwtSettings);
 
-// Register AuthService (scoped - depends on scoped IUserRepository) and OTP Service (singleton - in-memory store)
+// Encryption service — singleton because it only holds key material
+builder.Services.AddSingleton<IEncryptionService, EncryptionService>();
+
+// Register AuthService (scoped - depends on scoped IUserRepository) and OTP Service (scoped - depends on IOtpRepository)
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddSingleton<IOtpService, OtpService>();
+builder.Services.AddScoped<IOtpService, OtpService>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IOtpRepository, OtpRepository>();
+builder.Services.AddScoped<ILoginAuditRepository, LoginAuditRepository>();
+
+// SMS Service (Africa's Talking) - falls back to console logging when API key not configured
+builder.Services.AddHttpClient<ISmsService, AfricasTalkingService>();
+
+// SignalR for real-time ATM status updates
+builder.Services.AddSignalR();
 
 // Configure JWT Authentication
 builder.Services.AddAuthentication(options =>
@@ -112,6 +126,17 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(jwtSettings.Key)),
         ClockSkew = TimeSpan.Zero
+    };
+
+    // Allow reading the access token from an httpOnly cookie as fallback
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            if (string.IsNullOrEmpty(context.Token))
+                context.Token = context.Request.Cookies["kudiloc_access"];
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -170,7 +195,19 @@ builder.Services.AddScoped<IATMService, ATMService>();
 builder.Services.AddScoped<IStatusReportService, StatusReportService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
-builder.Services.AddSingleton<IPhotoService, PhotoService>();
+builder.Services.AddScoped<ICommentRepository, CommentRepository>();
+builder.Services.AddScoped<IBadgeRepository, BadgeRepository>();
+builder.Services.AddScoped<IVisitHistoryRepository, VisitHistoryRepository>();
+builder.Services.AddScoped<ICommentService, CommentService>();
+builder.Services.AddScoped<IBadgeService, BadgeService>();
+builder.Services.AddScoped<IVisitHistoryService, VisitHistoryService>();
+// Use Cloudinary for photo storage in production, local disk in development
+var cloudinaryConfigured = !string.IsNullOrEmpty(builder.Configuration["Cloudinary:CloudName"])
+    && !string.IsNullOrEmpty(builder.Configuration["Cloudinary:ApiKey"]);
+if (cloudinaryConfigured)
+    builder.Services.AddSingleton<IPhotoService, CloudinaryPhotoService>();
+else
+    builder.Services.AddSingleton<IPhotoService, PhotoService>();
 
 // Add Health Checks
 builder.Services.AddHealthChecks()
@@ -179,15 +216,28 @@ builder.Services.AddHealthChecks()
 // Configure CORS
 // In Development: allow any origin so frontend devs can connect from any host.
 // In Production: restrict to the configured allowed origins list.
-// CORS is open to any origin — access control is handled by ApiKeyMiddleware.
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("KudiLocPolicy", policy =>
+    if (builder.Environment.IsDevelopment())
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
-    });
+        options.AddPolicy("KudiLocPolicy", policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        });
+    }
+    else
+    {
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+        options.AddPolicy("KudiLocPolicy", policy =>
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowCredentials()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        });
+    }
 });
 
 // Serilog is configured above via builder.Host.UseSerilog()
@@ -282,6 +332,7 @@ app.UseAuthorization();
 app.UseStaticFiles();
 
 app.MapControllers();
+app.MapHub<ATMStatusHub>("/hubs/atm-status");
 
 // Root endpoint for quick status check
 app.MapGet("/", () => new

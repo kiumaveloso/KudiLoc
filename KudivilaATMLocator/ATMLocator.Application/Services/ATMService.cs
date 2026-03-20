@@ -22,6 +22,7 @@ public interface IATMService
     Task<List<FlatATMDto>> GetAllATMsFlatAsync(int limit = 200);
     Task<FlatATMDto?> GetFlatATMByIdAsync(string id);
     Task<FlatATMDto?> PatchATMAsync(string id, UpdateATMDto dto);
+    Task<PagedResultDto<FlatATMDto>> GetAllATMsFlatPagedAsync(int skip, int limit);
 }
 
 public class ATMService : IATMService
@@ -54,6 +55,7 @@ public class ATMService : IATMService
                 Neighborhood = dto.Neighborhood ?? string.Empty,
                 Landmark = dto.Landmark ?? string.Empty
             },
+            WorkingHours = dto.WorkingHours,
             SupportedServices = dto.SupportedServices ?? new List<string>(),
             PhotoUrls = new List<string>(),
             CurrentStatus = new ATMStatus
@@ -179,6 +181,20 @@ public class ATMService : IATMService
         return MapToFlatDto(updated);
     }
 
+    public async Task<PagedResultDto<FlatATMDto>> GetAllATMsFlatPagedAsync(int skip, int limit)
+    {
+        var atms = await _atmRepository.GetAllSortedByUpdatedPagedAsync(skip, limit);
+        var totalCount = await _atmRepository.CountAllAsync();
+        var items = atms.Select(MapToFlatDto).ToList();
+        return new PagedResultDto<FlatATMDto>(
+            items,
+            (skip / limit) + 1,
+            limit,
+            (int)totalCount,
+            (int)Math.Ceiling(totalCount / (double)limit)
+        );
+    }
+
     // --- Shared update logic ---
 
     private void ApplyUpdateFields(ATM atm, UpdateATMDto dto)
@@ -230,6 +246,7 @@ public class ATMService : IATMService
         if (dto.HasPaper.HasValue) atm.HasPaper = dto.HasPaper.Value;
         if (dto.LastReportTime.HasValue) atm.LastReportTime = dto.LastReportTime.Value;
         if (dto.RecentReportsCount.HasValue) atm.RecentReportsCount = dto.RecentReportsCount.Value;
+        if (dto.WorkingHours != null) atm.WorkingHours = dto.WorkingHours;
     }
 
     // --- Mapping ---

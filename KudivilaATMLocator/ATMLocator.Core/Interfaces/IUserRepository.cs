@@ -10,4 +10,7 @@ public interface IUserRepository
     Task<User> UpdateAsync(User user);
     Task<long> CountAllAsync();
     Task<bool> DeleteAsync(string id);
+    Task<List<User>> GetTopByReportsAsync(int limit = 20);
+    Task<List<User>> GetByIdsAsync(IEnumerable<string> ids);
+    Task<List<User>> GetUnmigratedAsync(); // users where PhoneNumberHash is null or empty
 }

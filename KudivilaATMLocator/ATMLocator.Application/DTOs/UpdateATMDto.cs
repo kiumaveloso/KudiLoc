@@ -1,3 +1,5 @@
+using ATMLocator.Core.Entities;
+
 namespace ATMLocator.Application.DTOs;
 
 public record UpdateATMDto(
@@ -16,5 +18,6 @@ public record UpdateATMDto(
     string? IsOnline,
     bool? HasPaper,
     DateTime? LastReportTime,
-    int? RecentReportsCount
+    int? RecentReportsCount,
+    WorkingHours? WorkingHours
 );
