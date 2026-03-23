@@ -28,12 +28,18 @@ public interface IATMService
 public class ATMService : IATMService
 {
     private const int MaxPageSize = 100;
+    private static readonly TimeSpan ListCacheTtl = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan SingleCacheTtl = TimeSpan.FromSeconds(30);
+    private const string AllAtmsCacheKey = "atms:all";
+
     private readonly IATMRepository _atmRepository;
+    private readonly ICacheService _cache;
     private readonly ATMSettings _settings;
 
-    public ATMService(IATMRepository atmRepository, IOptions<ATMSettings> settings)
+    public ATMService(IATMRepository atmRepository, IOptions<ATMSettings> settings, ICacheService cache)
     {
         _atmRepository = atmRepository;
+        _cache = cache;
         _settings = settings.Value;
     }
 
@@ -73,6 +79,12 @@ public class ATMService : IATMService
         atm.SyncLocation();
 
         var created = await _atmRepository.CreateAsync(atm);
+
+        // Invalidate list caches after creating a new ATM
+        await _cache.RemoveAsync(AllAtmsCacheKey);
+        if (!string.IsNullOrEmpty(created.Province))
+            await _cache.RemoveAsync($"atms:province:{created.Province}");
+
         return MapToDto(created);
     }
 
@@ -89,22 +101,38 @@ public class ATMService : IATMService
 
     public async Task<ATMDto?> GetATMByIdAsync(string id)
     {
+        var cacheKey = $"atm:{id}";
+        var cached = await _cache.GetAsync<ATMDto>(cacheKey);
+        if (cached != null) return cached;
+
         var atm = await _atmRepository.GetByIdAsync(id);
-        return atm == null ? null : MapToDto(atm);
+        if (atm == null) return null;
+
+        var dto = MapToDto(atm);
+        await _cache.SetAsync(cacheKey, dto, SingleCacheTtl);
+        return dto;
     }
 
     public async Task<PagedResultDto<ATMDto>> GetATMsByProvinceAsync(string province, int page = 1, int pageSize = 20)
     {
         pageSize = Math.Clamp(pageSize, 1, MaxPageSize);
         page = Math.Max(1, page);
+
+        var cacheKey = $"atms:province:{province}:p{page}:s{pageSize}";
+        var cached = await _cache.GetAsync<PagedResultDto<ATMDto>>(cacheKey);
+        if (cached != null) return cached;
+
         var skip = (page - 1) * pageSize;
         var atms = await _atmRepository.GetByProvinceAsync(province, skip, pageSize);
         var totalCount = await _atmRepository.CountByProvinceAsync(province);
-        return new PagedResultDto<ATMDto>(
+        var result = new PagedResultDto<ATMDto>(
             atms.Select(MapToDto).ToList(),
             page, pageSize, (int)totalCount,
             (int)Math.Ceiling(totalCount / (double)pageSize)
         );
+
+        await _cache.SetAsync(cacheKey, result, ListCacheTtl);
+        return result;
     }
 
     public async Task<PagedResultDto<ATMDto>> SearchATMsAsync(string searchTerm, int page = 1, int pageSize = 20)
@@ -148,26 +176,56 @@ public class ATMService : IATMService
         ApplyUpdateFields(atm, dto);
 
         var updated = await _atmRepository.UpdateAsync(atm);
+
+        // Invalidate caches for this ATM and related lists
+        await InvalidateAtmCachesAsync(updated.Id, updated.Province);
+
         return MapToDto(updated);
     }
 
     public async Task<bool> DeleteATMAsync(string id)
     {
-        return await _atmRepository.DeleteAsync(id);
+        // Fetch ATM before deleting so we can invalidate the province cache
+        var atm = await _atmRepository.GetByIdAsync(id);
+        var result = await _atmRepository.DeleteAsync(id);
+
+        if (result)
+        {
+            await _cache.RemoveAsync($"atm:{id}");
+            await _cache.RemoveAsync(AllAtmsCacheKey);
+            if (atm != null && !string.IsNullOrEmpty(atm.Province))
+                await _cache.RemoveByPrefixAsync($"atms:province:{atm.Province}");
+        }
+
+        return result;
     }
 
     // --- kudi-cash-find methods ---
 
     public async Task<List<FlatATMDto>> GetAllATMsFlatAsync(int limit = 200)
     {
+        var cacheKey = $"{AllAtmsCacheKey}:flat:{limit}";
+        var cached = await _cache.GetAsync<List<FlatATMDto>>(cacheKey);
+        if (cached != null) return cached;
+
         var atms = await _atmRepository.GetAllSortedByUpdatedAsync(limit);
-        return atms.Select(MapToFlatDto).ToList();
+        var result = atms.Select(MapToFlatDto).ToList();
+        await _cache.SetAsync(cacheKey, result, ListCacheTtl);
+        return result;
     }
 
     public async Task<FlatATMDto?> GetFlatATMByIdAsync(string id)
     {
+        var cacheKey = $"atm:{id}:flat";
+        var cached = await _cache.GetAsync<FlatATMDto>(cacheKey);
+        if (cached != null) return cached;
+
         var atm = await _atmRepository.GetByIdAsync(id);
-        return atm == null ? null : MapToFlatDto(atm);
+        if (atm == null) return null;
+
+        var dto = MapToFlatDto(atm);
+        await _cache.SetAsync(cacheKey, dto, SingleCacheTtl);
+        return dto;
     }
 
     public async Task<FlatATMDto?> PatchATMAsync(string id, UpdateATMDto dto)
@@ -178,6 +236,10 @@ public class ATMService : IATMService
         ApplyUpdateFields(atm, dto);
 
         var updated = await _atmRepository.UpdateAsync(atm);
+
+        // Invalidate caches for this ATM and related lists
+        await InvalidateAtmCachesAsync(updated.Id, updated.Province);
+
         return MapToFlatDto(updated);
     }
 
@@ -193,6 +255,24 @@ public class ATMService : IATMService
             (int)totalCount,
             (int)Math.Ceiling(totalCount / (double)limit)
         );
+    }
+
+    // --- Cache invalidation ---
+
+    /// <summary>
+    /// Invalidates all cache entries related to a specific ATM: the single-ATM keys,
+    /// the all-ATMs list key, and the province-scoped list prefix.
+    /// </summary>
+    private async Task InvalidateAtmCachesAsync(string atmId, string? province)
+    {
+        await _cache.RemoveAsync($"atm:{atmId}");
+        await _cache.RemoveAsync($"atm:{atmId}:flat");
+        await _cache.RemoveAsync(AllAtmsCacheKey);
+        // Also invalidate the flat all-ATMs variants (we cannot enumerate all limit values,
+        // so we remove the most common default used by GetAllATMsFlatAsync)
+        await _cache.RemoveAsync($"{AllAtmsCacheKey}:flat:200");
+        if (!string.IsNullOrEmpty(province))
+            await _cache.RemoveByPrefixAsync($"atms:province:{province}");
     }
 
     // --- Shared update logic ---

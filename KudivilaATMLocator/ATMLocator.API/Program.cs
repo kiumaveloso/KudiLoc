@@ -174,6 +174,22 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// Redis distributed cache (Upstash or local Redis)
+var redisConnection = builder.Configuration["Redis:ConnectionString"];
+if (!string.IsNullOrEmpty(redisConnection))
+{
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnection;
+    });
+}
+else
+{
+    // Fallback to in-memory distributed cache when Redis is not configured (development)
+    builder.Services.AddDistributedMemoryCache();
+}
+builder.Services.AddScoped<ICacheService, CacheService>();
+
 // Configure ATM and Report settings
 builder.Services.Configure<ATMSettings>(
     builder.Configuration.GetSection("ATMSettings"));
