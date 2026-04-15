@@ -2,7 +2,16 @@ namespace ATMLocator.Application.DTOs;
 
 public record LocationDto(double Latitude, double Longitude, string Province, string Municipality);
 
-public record ATMStatusDto(bool HasCash, string OperationalStatus, int ReliabilityScore, DateTime LastVerified, string StatusDescription, int TotalReports);
+public record ATMStatusDto(
+    bool HasCash,
+    bool HasMoney,
+    bool HasPaper,
+    string OperationalStatus,
+    int ReliabilityScore,
+    DateTime LastVerified,
+    string StatusDescription,
+    int TotalReports
+);
 
 public record AddressDto(string Street, string Neighborhood, string? Landmark);
 
@@ -11,6 +20,12 @@ public record ATMDto(
     string Name,
     string BankName,
     LocationDto Location,
+    /// <summary>
+    /// GeoJSON-ordered coordinates [longitude, latitude] for Mapbox GL JS markers.
+    /// </summary>
+    double[] Coordinates,
+    bool HasMoney,
+    bool HasPaper,
     ATMStatusDto Status,
     AddressDto Address,
     List<string> SupportedServices,

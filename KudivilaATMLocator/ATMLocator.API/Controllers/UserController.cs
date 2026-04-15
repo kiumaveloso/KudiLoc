@@ -1,6 +1,5 @@
 using ATMLocator.Application.DTOs;
 using ATMLocator.Application.Services;
-using ATMLocator.Core.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Asp.Versioning;
@@ -24,15 +23,15 @@ public class UserController : ControllerBase
 
     [Authorize]
     [HttpGet("{id}")]
-    public async Task<ActionResult<User>> GetUserById(string id)
+    public async Task<ActionResult<UserDto>> GetUserById(string id)
     {
         try
         {
             var user = await _userService.GetUserByIdAsync(id);
-            
+
             if (user == null)
             {
-                return NotFound(new { statusCode = 404, message = "Utilizador não encontrado" });
+                return NotFound(new { statusCode = 404, message = "Utilizador nao encontrado" });
             }
             return Ok(user);
         }
@@ -45,15 +44,15 @@ public class UserController : ControllerBase
 
     [Authorize]
     [HttpGet("phone/{phoneNumber}")]
-    public async Task<ActionResult<User>> GetUserByPhoneNumber(string phoneNumber)
+    public async Task<ActionResult<UserDto>> GetUserByPhoneNumber(string phoneNumber)
     {
         try
         {
             var user = await _userService.GetUserByPhoneNumberAsync(phoneNumber);
-            
+
             if (user == null)
             {
-                return NotFound(new { statusCode = 404, message = "Utilizador não encontrado" });
+                return NotFound(new { statusCode = 404, message = "Utilizador nao encontrado" });
             }
             return Ok(user);
         }
@@ -73,7 +72,7 @@ public class UserController : ControllerBase
             var deleted = await _userService.DeleteUserAsync(id);
             if (!deleted)
             {
-                return NotFound(new { statusCode = 404, message = "Utilizador não encontrado" });
+                return NotFound(new { statusCode = 404, message = "Utilizador nao encontrado" });
             }
             return NoContent();
         }
@@ -86,7 +85,7 @@ public class UserController : ControllerBase
 
     [Authorize]
     [HttpPut("{id}")]
-    public async Task<ActionResult<User>> UpdateUser(string id, [FromBody] UpdateUserDto dto)
+    public async Task<ActionResult<UserDto>> UpdateUser(string id, [FromBody] UpdateUserDto dto)
     {
         try
         {
@@ -95,7 +94,7 @@ public class UserController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            return NotFound(ex.Message);
+            return NotFound(new { statusCode = 404, message = ex.Message });
         }
         catch (Exception ex)
         {

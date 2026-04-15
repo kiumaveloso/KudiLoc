@@ -275,9 +275,9 @@ public class ATMController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new ATM. AllowAnonymous for kudi-cash-find frontend compatibility.
+    /// Create a new ATM. Restricted to Admin users only.
     /// </summary>
-    [AllowAnonymous]
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<ActionResult<ATMDto>> CreateATM([FromBody] CreateATMDto dto)
     {
@@ -336,7 +336,7 @@ public class ATMController : ControllerBase
         }
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteATM(string id)
     {

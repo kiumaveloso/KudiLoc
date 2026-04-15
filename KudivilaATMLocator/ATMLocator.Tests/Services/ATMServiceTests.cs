@@ -13,13 +13,15 @@ namespace ATMLocator.Tests;
 public class ATMServiceTests
 {
     private readonly Mock<IATMRepository> _mockRepo;
+    private readonly Mock<ICacheService> _mockCache;
     private readonly ATMService _service;
 
     public ATMServiceTests()
     {
         _mockRepo = new Mock<IATMRepository>();
+        _mockCache = new Mock<ICacheService>();
         var settings = Options.Create(new ATMSettings());
-        _service = new ATMService(_mockRepo.Object, settings);
+        _service = new ATMService(_mockRepo.Object, settings, _mockCache.Object);
     }
 
     private ATM CreateTestATM(string id, string name, bool hasCash, int reliabilityScore)
@@ -194,7 +196,6 @@ public class ATMServiceTests
         _mockRepo.Setup(r => r.SearchAsync("BFA", It.IsAny<int>(), It.IsAny<int>()))
             .ReturnsAsync(new List<ATM> { testATMs[0] });
         _mockRepo.Setup(r => r.CountSearchAsync("BFA")).ReturnsAsync(1);
-
         // Act
         var result = await _service.SearchATMsAsync("BFA");
 

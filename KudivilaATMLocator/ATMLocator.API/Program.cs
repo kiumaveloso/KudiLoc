@@ -232,6 +232,7 @@ builder.Services.AddHealthChecks()
 // Configure CORS
 // In Development: allow any origin so frontend devs can connect from any host.
 // In Production: restrict to the configured allowed origins list.
+// Origins can be set via appsettings.json or via env vars (e.g. Cors__AllowedOrigins__0).
 builder.Services.AddCors(options =>
 {
     if (builder.Environment.IsDevelopment())
@@ -245,14 +246,33 @@ builder.Services.AddCors(options =>
     }
     else
     {
-        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-        options.AddPolicy("KudiLocPolicy", policy =>
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?.Where(o => !string.IsNullOrWhiteSpace(o)).ToArray() ?? [];
+
+        if (allowedOrigins.Length == 0)
         {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowCredentials()
-                  .AllowAnyMethod()
-                  .AllowAnyHeader();
-        });
+            // Fallback: allow all origins with credentials disabled.
+            // This is logged as a warning so operators know CORS is not restrictive.
+            Log.Warning("No CORS origins configured (Cors:AllowedOrigins). " +
+                        "Set Cors__AllowedOrigins__0 etc. in environment variables. " +
+                        "Falling back to AllowAnyOrigin (credentials disabled).");
+            options.AddPolicy("KudiLocPolicy", policy =>
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            });
+        }
+        else
+        {
+            options.AddPolicy("KudiLocPolicy", policy =>
+            {
+                policy.WithOrigins(allowedOrigins)
+                      .AllowCredentials()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            });
+        }
     }
 });
 

@@ -103,6 +103,7 @@ public class StatusReportService : IStatusReportService
             ATMId = dto.ATMId,
             UserId = dto.UserId ?? string.Empty,
             HasCash = hasCash,
+            HasPaper = dto.HasPaper,
             OperationalStatus = operationalStatus,
             Notes = dto.Notes,
             Status = ReportStatus.Pending,
@@ -127,6 +128,8 @@ public class StatusReportService : IStatusReportService
             {
                 atm_id = atm.Id,
                 has_cash = atm.CurrentStatus.HasCash,
+                has_money = atm.CurrentStatus.HasCash,
+                has_paper = atm.HasPaper,
                 reliability_score = atm.CurrentStatus.ReliabilityScore,
                 last_verified = atm.CurrentStatus.LastVerified,
                 total_reports = atm.CurrentStatus.TotalReports,
@@ -211,6 +214,13 @@ public class StatusReportService : IStatusReportService
             hasMoneyNow ? hasCashReports.Count : noCashReports.Count
         );
 
+        // Aggregate HasPaper using the same weighted approach as HasCash
+        var hasPaperReports = recentReports.Where(r => r.HasPaper).ToList();
+        var noPaperReports = recentReports.Where(r => !r.HasPaper).ToList();
+        var hasPaperWeight = CalculateReportWeight(hasPaperReports, userMap);
+        var noPaperWeight = CalculateReportWeight(noPaperReports, userMap);
+        bool hasPaperNow = hasPaperWeight >= noPaperWeight;
+
         // Determine operational status from most recent reports (majority vote)
         var operationalVotes = recentReports
             .GroupBy(r => r.OperationalStatus)
@@ -223,11 +233,12 @@ public class StatusReportService : IStatusReportService
         atm.CurrentStatus.ReliabilityScore = reliabilityScore;
         atm.CurrentStatus.LastVerified = DateTime.UtcNow;
         atm.CurrentStatus.TotalReports = recentReports.Count;
+        atm.HasPaper = hasPaperNow;
 
         // Sync the IsOnline field for kudi-cash-find compatibility
         atm.IsOnline = operationalVotes switch
         {
-            OperationalStatus.Operational => "online",
+            OperationalStatus.Online => "online",
             OperationalStatus.Offline => "offline",
             OperationalStatus.Maintenance => "maintenance",
             _ => "online"
@@ -333,6 +344,8 @@ public class StatusReportService : IStatusReportService
             report.ATMId,
             string.IsNullOrEmpty(report.UserId) ? null : report.UserId,
             report.HasCash,
+            report.HasPaper,
+            report.OperationalStatus.ToString(),
             report.Notes,
             report.ReportedAt,
             report.Status.ToString(),

@@ -79,9 +79,15 @@ public class ATMStatus
 
 public enum OperationalStatus
 {
-    Operational,
+    Online,
     Maintenance,
-    Offline
+    Offline,
+
+    /// <summary>
+    /// Legacy alias kept so existing MongoDB documents with "Operational" deserialize correctly.
+    /// New code should use <see cref="Online"/>.
+    /// </summary>
+    Operational = Online
 }
 
 public class WorkingHours

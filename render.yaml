@@ -34,3 +34,15 @@ services:
         sync: false  # Set manually in Render dashboard
       - key: AfricasTalking__SenderId
         value: KudiLoc
+      - key: Encryption__Key
+        sync: false  # 32-byte base64 string: openssl rand -base64 32
+      - key: Encryption__HmacKey
+        sync: false  # 32+ byte base64 string: openssl rand -base64 32
+      - key: Cors__AllowedOrigins__0
+        sync: false  # Primary frontend URL, e.g. https://kudiloc.com
+      - key: Cors__AllowedOrigins__1
+        sync: false  # Secondary frontend URL, e.g. https://www.kudiloc.com
+      - key: Redis__ConnectionString
+        sync: false  # Upstash Redis connection string (optional, falls back to in-memory)
+      - key: ApiKey
+        sync: false  # Optional API key for X-API-Key header enforcement

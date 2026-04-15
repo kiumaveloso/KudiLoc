@@ -272,27 +272,16 @@ public class AuthController : ControllerBase
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(userId))
         {
-            return Unauthorized(new { statusCode = 401, message = "Token inválido" });
+            return Unauthorized(new { statusCode = 401, message = "Token invalido" });
         }
 
         var user = await _userService.GetUserByIdAsync(userId);
         if (user == null)
         {
-            return NotFound(new { statusCode = 404, message = "Utilizador não encontrado" });
+            return NotFound(new { statusCode = 404, message = "Utilizador nao encontrado" });
         }
 
-        return Ok(new
-        {
-            user.Id,
-            user.PhoneNumber,
-            FullName = user.Name ?? string.Empty,
-            Email = user.PhoneNumber,
-            user.Name,
-            user.ReputationScore,
-            user.TotalReports,
-            user.AccurateReports,
-            user.CreatedAt
-        });
+        return Ok(user);
     }
 
     // -----------------------------------------------------------------------

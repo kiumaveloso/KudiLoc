@@ -92,9 +92,11 @@ public class ATMService : IATMService
     {
         var atms = await _atmRepository.GetNearbyAsync(latitude, longitude, radiusKm);
 
+        // Return ALL nearby ATMs — let the mobile/web client decide what to display.
+        // Sorting: online ATMs with cash first, then by reliability score.
         return atms
-            .Where(a => a.CurrentStatus.HasCash && a.CurrentStatus.ReliabilityScore >= _settings.MinReliabilityScore)
-            .OrderByDescending(a => a.CurrentStatus.ReliabilityScore)
+            .OrderByDescending(a => a.CurrentStatus.HasCash)
+            .ThenByDescending(a => a.CurrentStatus.ReliabilityScore)
             .Select(MapToDto)
             .ToList();
     }
@@ -316,7 +318,7 @@ public class ATMService : IATMService
             // Also sync to the enum-based OperationalStatus
             atm.CurrentStatus.OperationalStatus = dto.IsOnline.ToLowerInvariant() switch
             {
-                "online" => OperationalStatus.Operational,
+                "online" => OperationalStatus.Online,
                 "offline" => OperationalStatus.Offline,
                 "maintenance" => OperationalStatus.Maintenance,
                 _ => atm.CurrentStatus.OperationalStatus
@@ -343,8 +345,14 @@ public class ATMService : IATMService
                 atm.Province,
                 atm.Municipality
             ),
+            // GeoJSON-ordered coordinates [longitude, latitude] for Mapbox GL JS
+            new[] { atm.Longitude, atm.Latitude },
+            atm.CurrentStatus.HasCash,
+            atm.HasPaper,
             new ATMStatusDto(
                 atm.CurrentStatus.HasCash,
+                atm.CurrentStatus.HasCash,
+                atm.HasPaper,
                 atm.CurrentStatus.OperationalStatus.ToString(),
                 atm.CurrentStatus.ReliabilityScore,
                 atm.CurrentStatus.LastVerified,
@@ -381,7 +389,7 @@ public class ATMService : IATMService
             ? atm.IsOnline
             : atm.CurrentStatus.OperationalStatus switch
             {
-                OperationalStatus.Operational => "online",
+                OperationalStatus.Online => "online",
                 OperationalStatus.Offline => "offline",
                 OperationalStatus.Maintenance => "maintenance",
                 _ => "online"

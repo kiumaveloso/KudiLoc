@@ -16,16 +16,14 @@ public class OtpRepository : IOtpRepository
 
     public async Task SaveAsync(string phoneNumber, string code, DateTime expiresAt)
     {
-        var entry = new OtpEntry
-        {
-            Id = Guid.NewGuid().ToString(),
-            PhoneNumber = phoneNumber,
-            Code = code,
-            ExpiresAt = expiresAt
-        };
-
         var filter = Builders<OtpEntry>.Filter.Eq(o => o.PhoneNumber, phoneNumber);
-        await _context.OtpEntries.ReplaceOneAsync(filter, entry, new ReplaceOptions { IsUpsert = true });
+        var update = Builders<OtpEntry>.Update
+            .Set(o => o.Code, code)
+            .Set(o => o.ExpiresAt, expiresAt)
+            .SetOnInsert(o => o.Id, Guid.NewGuid().ToString())
+            .SetOnInsert(o => o.PhoneNumber, phoneNumber);
+
+        await _context.OtpEntries.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true });
     }
 
     public async Task<OtpEntry?> GetAsync(string phoneNumber)

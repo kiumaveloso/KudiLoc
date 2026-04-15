@@ -31,20 +31,35 @@ public class ATMRepository : IATMRepository
 
     public async Task<List<ATM>> GetNearbyAsync(double latitude, double longitude, double radiusKm)
     {
-        // Use MongoDB $nearSphere with 2dsphere index instead of loading all ATMs into memory.
-        // MongoDB uses meters for $maxDistance with GeoJSON.
-        var radiusMeters = radiusKm * 1000;
+        // Use a lat/lon bounding box (standard field index) instead of $nearSphere
+        // to avoid dependency on the 2dsphere index which may not exist in all deployments.
+        var latDelta = radiusKm / 110.574;
+        var lonDelta = radiusKm / (111.32 * Math.Cos(latitude * Math.PI / 180.0));
 
-        var filter = Builders<ATM>.Filter.NearSphere(
-            atm => atm.Location,
-            longitude, // GeoJSON order: longitude first
-            latitude,
-            maxDistance: radiusMeters
+        var filter = Builders<ATM>.Filter.And(
+            Builders<ATM>.Filter.Gte(a => a.Latitude,  latitude  - latDelta),
+            Builders<ATM>.Filter.Lte(a => a.Latitude,  latitude  + latDelta),
+            Builders<ATM>.Filter.Gte(a => a.Longitude, longitude - lonDelta),
+            Builders<ATM>.Filter.Lte(a => a.Longitude, longitude + lonDelta)
         );
 
-        return await _context.ATMs
-            .Find(filter)
-            .ToListAsync();
+        var candidates = await _context.ATMs.Find(filter).ToListAsync();
+
+        // Refine with exact Haversine distance to remove bounding-box corners
+        return candidates
+            .Where(atm => HaversineKm(latitude, longitude, atm.Latitude, atm.Longitude) <= radiusKm)
+            .ToList();
+    }
+
+    private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371.0;
+        var dLat = (lat2 - lat1) * Math.PI / 180.0;
+        var dLon = (lon2 - lon1) * Math.PI / 180.0;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+              + Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0)
+              * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        return R * 2.0 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1.0 - a));
     }
 
     public async Task<List<ATM>> GetByProvinceAsync(string province, int skip = 0, int limit = 20)

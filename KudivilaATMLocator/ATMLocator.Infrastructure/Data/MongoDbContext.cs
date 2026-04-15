@@ -3,6 +3,7 @@ using ATMLocator.Infrastructure.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Driver;
 
 namespace ATMLocator.Infrastructure.Data;
@@ -16,6 +17,11 @@ public class MongoDbContext
 
     static MongoDbContext()
     {
+        // Ignore any unknown fields in MongoDB documents (e.g. legacy fields
+        // that no longer exist in the C# model like Is24Hours → IsOpen24Hours).
+        var pack = new ConventionPack { new IgnoreExtraElementsConvention(true) };
+        ConventionRegistry.Register("IgnoreExtraElements", pack, _ => true);
+
         // Register BSON class map so GeoJsonPoint serializes with lowercase
         // field names required by MongoDB 2dsphere indexes.
         if (!BsonClassMap.IsClassMapRegistered(typeof(GeoJsonPoint)))

@@ -6,7 +6,8 @@ public class StatusReport
     public string ATMId { get; set; } = string.Empty;
     public string UserId { get; set; } = string.Empty;
     public bool HasCash { get; set; }
-    public OperationalStatus OperationalStatus { get; set; } = OperationalStatus.Operational;
+    public bool HasPaper { get; set; } = true;
+    public OperationalStatus OperationalStatus { get; set; } = OperationalStatus.Online;
     public ReportStatus Status { get; set; } // Pending, Verified, Rejected
     public int ConfirmationCount { get; set; } // How many users confirmed this
     public DateTime ReportedAt { get; set; }

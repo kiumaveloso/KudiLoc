@@ -22,6 +22,14 @@ public class CreateStatusReportDtoValidator : AbstractValidator<CreateStatusRepo
             .Must(s => s == null || s == "has_money" || s == "no_money")
             .WithMessage("status_reported deve ser 'has_money' ou 'no_money'");
 
+        RuleFor(x => x.OperationalStatus)
+            .Must(s => s == null
+                || s.Equals("Online", StringComparison.OrdinalIgnoreCase)
+                || s.Equals("Operational", StringComparison.OrdinalIgnoreCase)
+                || s.Equals("Offline", StringComparison.OrdinalIgnoreCase)
+                || s.Equals("Maintenance", StringComparison.OrdinalIgnoreCase))
+            .WithMessage("operational_status deve ser 'Online', 'Offline' ou 'Maintenance'");
+
         RuleFor(x => x.CreatedBy)
             .MaximumLength(200)
             .When(x => !string.IsNullOrEmpty(x.CreatedBy));

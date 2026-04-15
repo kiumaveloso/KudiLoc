@@ -46,7 +46,7 @@ public class StatusReportControllerTests : IClassFixture<CustomWebApplicationFac
             .Setup(r => r.GetByIdAsync("atm1"))
             .ReturnsAsync((ATM?)null);
 
-        var dto = new CreateStatusReportDto("atm1", null, true, null, null, null, null, null);
+        var dto = new CreateStatusReportDto("atm1", null, HasCash: true);
 
         var response = await _client.PostAsJsonAsync("/api/StatusReport", dto);
 
@@ -63,7 +63,7 @@ public class StatusReportControllerTests : IClassFixture<CustomWebApplicationFac
             .Setup(r => r.GetByIdAsync("nonexistent"))
             .ReturnsAsync((ATM?)null);
 
-        var dto = new CreateStatusReportDto("nonexistent", "user1", true, null, null, null, null, null);
+        var dto = new CreateStatusReportDto("nonexistent", "user1", HasCash: true);
         var response = await _client.PostAsJsonAsync("/api/StatusReport", dto);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);

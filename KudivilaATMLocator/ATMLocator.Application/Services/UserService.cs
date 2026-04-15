@@ -6,10 +6,10 @@ namespace ATMLocator.Application.Services;
 
 public interface IUserService
 {
-    Task<User?> GetUserByIdAsync(string id);
-    Task<User?> GetUserByPhoneNumberAsync(string phoneNumber);
-    Task<User> CreateUserAsync(CreateUserDto dto);
-    Task<User> UpdateUserAsync(string id, UpdateUserDto dto);
+    Task<UserDto?> GetUserByIdAsync(string id);
+    Task<UserDto?> GetUserByPhoneNumberAsync(string phoneNumber);
+    Task<UserDto> CreateUserAsync(CreateUserDto dto);
+    Task<UserDto> UpdateUserAsync(string id, UpdateUserDto dto);
     Task<bool> DeleteUserAsync(string id);
 }
 
@@ -22,17 +22,19 @@ public class UserService : IUserService
         _userRepository = userRepository;
     }
 
-    public async Task<User?> GetUserByIdAsync(string id)
+    public async Task<UserDto?> GetUserByIdAsync(string id)
     {
-        return await _userRepository.GetByIdAsync(id);
+        var user = await _userRepository.GetByIdAsync(id);
+        return user == null ? null : MapToDto(user);
     }
 
-    public async Task<User?> GetUserByPhoneNumberAsync(string phoneNumber)
+    public async Task<UserDto?> GetUserByPhoneNumberAsync(string phoneNumber)
     {
-        return await _userRepository.GetByPhoneNumberAsync(phoneNumber);
+        var user = await _userRepository.GetByPhoneNumberAsync(phoneNumber);
+        return user == null ? null : MapToDto(user);
     }
 
-    public async Task<User> CreateUserAsync(CreateUserDto dto)
+    public async Task<UserDto> CreateUserAsync(CreateUserDto dto)
     {
         var existingUser = await _userRepository.GetByPhoneNumberAsync(dto.PhoneNumber);
         if (existingUser != null)
@@ -50,15 +52,16 @@ public class UserService : IUserService
             CreatedAt = DateTime.UtcNow
         };
 
-        return await _userRepository.CreateAsync(user);
+        var created = await _userRepository.CreateAsync(user);
+        return MapToDto(created);
     }
 
-    public async Task<User> UpdateUserAsync(string id, UpdateUserDto dto)
+    public async Task<UserDto> UpdateUserAsync(string id, UpdateUserDto dto)
     {
         var user = await _userRepository.GetByIdAsync(id);
         if (user == null)
         {
-            throw new ArgumentException("User not found");
+            throw new ArgumentException("Utilizador nao encontrado");
         }
 
         if (!string.IsNullOrEmpty(dto.Name))
@@ -66,11 +69,25 @@ public class UserService : IUserService
             user.Name = dto.Name;
         }
 
-        return await _userRepository.UpdateAsync(user);
+        var updated = await _userRepository.UpdateAsync(user);
+        return MapToDto(updated);
     }
 
     public async Task<bool> DeleteUserAsync(string id)
     {
         return await _userRepository.DeleteAsync(id);
+    }
+
+    private static UserDto MapToDto(User user)
+    {
+        return new UserDto(
+            user.Id,
+            user.Name,
+            user.ReputationScore,
+            user.TotalReports,
+            user.AccurateReports,
+            user.Role,
+            user.CreatedAt
+        );
     }
 }

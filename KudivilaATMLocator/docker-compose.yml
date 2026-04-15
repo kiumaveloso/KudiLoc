@@ -11,6 +11,8 @@ services:
       - Jwt__Issuer=KudiLoc
       - Jwt__Audience=KudiLoc
       - Jwt__ExpirationDays=30
+      - Encryption__Key=JVP78P0qfNJVk2guzRdus4djy/WIzKwGRmDBAQQMNr0=
+      - Encryption__HmacKey=7ZvY3DeY+Zc6zdmfmwZVk5YFXPEtACUJgCUGOodWk8o=
     depends_on:
       mongo:
         condition: service_healthy

@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "KudiLoc",
+    "slug": "kudiloc",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "kudiloc",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#059669"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.kudivila.kudiloc",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "KudiLoc precisa da sua localização para encontrar ATMs próximos.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "KudiLoc precisa da sua localização para encontrar ATMs próximos."
+      }
+    },
+    "android": {
+      "package": "com.kudivila.kudiloc",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#059669"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "@rnmapbox/maps",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "KudiLoc precisa da sua localização para encontrar ATMs próximos."
+        }
+      ]
+    ]
+  }
+}

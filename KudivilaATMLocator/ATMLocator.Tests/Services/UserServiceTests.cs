@@ -24,21 +24,20 @@ public class UserServiceTests
     {
         _mockRepo.Setup(r => r.GetByPhoneNumberAsync(It.IsAny<string>()))
             .ReturnsAsync((User?)null);
-        
+
         _mockRepo.Setup(r => r.CreateAsync(It.IsAny<User>()))
-            .ReturnsAsync((User u) => 
+            .ReturnsAsync((User u) =>
             {
                 u.Id = "user123";
                 return u;
             });
 
-        var dto = new CreateUserDto("+244923456789", "João Silva");
+        var dto = new CreateUserDto("+244923456789", "Joao Silva");
 
         var result = await _service.CreateUserAsync(dto);
 
         result.Should().NotBeNull();
-        result.PhoneNumber.Should().Be("+244923456789");
-        result.Name.Should().Be("João Silva");
+        result.Name.Should().Be("Joao Silva");
         result.ReputationScore.Should().Be(50);
         _mockRepo.Verify(r => r.CreateAsync(It.IsAny<User>()), Times.Once);
     }
@@ -73,7 +72,7 @@ public class UserServiceTests
         {
             Id = "user123",
             PhoneNumber = "+244923456789",
-            Name = "João Silva",
+            Name = "Joao Silva",
             ReputationScore = 85,
             TotalReports = 20,
             AccurateReports = 18,
@@ -86,8 +85,8 @@ public class UserServiceTests
         var result = await _service.GetUserByPhoneNumberAsync("+244923456789");
 
         result.Should().NotBeNull();
-        result!.PhoneNumber.Should().Be("+244923456789");
-        result.ReputationScore.Should().Be(85);
+        result!.ReputationScore.Should().Be(85);
+        result.Name.Should().Be("Joao Silva");
     }
 
     [Fact]

@@ -82,7 +82,7 @@ public class StatusReportServiceTests
         _mockAtmRepo.Setup(r => r.GetByIdAsync(It.IsAny<string>()))
             .ReturnsAsync((ATM?)null);
 
-        var dto = new CreateStatusReportDto("nonexistent-atm", "user123", true, null, null, null, null, null);
+        var dto = new CreateStatusReportDto("nonexistent-atm", "user123", HasCash: true);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(
@@ -100,7 +100,7 @@ public class StatusReportServiceTests
         _mockUserRepo.Setup(r => r.GetByIdAsync(It.IsAny<string>()))
             .ReturnsAsync((User?)null);
 
-        var dto = new CreateStatusReportDto("atm123", "nonexistent-user", true, null, null, null, null, null);
+        var dto = new CreateStatusReportDto("atm123", "nonexistent-user", HasCash: true);
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(
@@ -126,7 +126,7 @@ public class StatusReportServiceTests
         _mockReportRepo.Setup(r => r.UpdateAsync(It.IsAny<StatusReport>()))
             .ReturnsAsync((StatusReport r) => r);
 
-        var dto = new CreateStatusReportDto("atm123", "user123", true, null, null, null, null, null);
+        var dto = new CreateStatusReportDto("atm123", "user123", HasCash: true);
 
         // Act
         var result = await _service.SubmitReportAsync(dto);

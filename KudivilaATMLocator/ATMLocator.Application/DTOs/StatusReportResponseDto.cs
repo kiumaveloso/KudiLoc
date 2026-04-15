@@ -5,6 +5,8 @@ public record StatusReportResponseDto(
     string ATMId,
     string? UserId,
     bool HasCash,
+    bool HasPaper,
+    string OperationalStatus,
     string? Notes,
     DateTime ReportedAt,
     string Status,

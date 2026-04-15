@@ -5,6 +5,7 @@ using ATMLocator.API.HealthChecks;
 using ATMLocator.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Moq;
@@ -21,6 +22,16 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+
+        // Provide test-only encryption keys so EncryptionService does not throw on startup
+        builder.ConfigureAppConfiguration((_, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Encryption:Key"] = "dGVzdGluZ2tleXRoYXRpczMyYnl0ZXNsb25nIQ==",
+                ["Encryption:HmacKey"] = "dGVzdGluZ2htYWNrZXl0aGF0aXMzMmJ5dGVzbG9uZw==",
+            });
+        });
 
         builder.ConfigureServices(services =>
         {

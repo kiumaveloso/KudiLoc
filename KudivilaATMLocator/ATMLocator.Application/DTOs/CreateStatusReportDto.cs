@@ -4,11 +4,12 @@ public record CreateStatusReportDto(
     string ATMId,
     string? UserId,
     bool HasCash,
-    string? StatusReported,
-    string? OperationalStatus,
-    string? Notes,
-    int? ReporterReputation,
-    string? CreatedBy,
+    bool HasPaper = true,
+    string? StatusReported = null,
+    string? OperationalStatus = null,
+    string? Notes = null,
+    int? ReporterReputation = null,
+    string? CreatedBy = null,
     double? Latitude = null,
     double? Longitude = null
 );

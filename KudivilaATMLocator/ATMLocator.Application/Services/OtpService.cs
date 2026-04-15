@@ -35,8 +35,10 @@ public class OtpService : IOtpService
         if (DateTime.UtcNow > entry.ExpiresAt)
             return false;
 
-        await _otpRepository.DeleteAsync(phoneNumber);
+        if (entry.Code != otpCode)
+            return false;
 
-        return entry.Code == otpCode;
+        await _otpRepository.DeleteAsync(phoneNumber);
+        return true;
     }
 }
