@@ -28,16 +28,16 @@ interface AuthState {
   isAuthenticated: boolean;
   /** Called after OTP verify succeeds (stores AuthResponse). */
   onLoginSuccess: (auth: AuthResponse) => void;
-  loginAsDemo: () => void;
+  loginAsDemo: (name?: string) => void;
   logout: () => Promise<void>;
 }
 
 const DEMO_USER: UserDto = {
   id: 'demo-user-001',
   name: 'Utilizador Demo',
-  reputationScore: 120,
-  totalReports: 8,
-  accurateReports: 7,
+  reputationScore: 0,
+  totalReports: 0,
+  accurateReports: 0,
   role: 'User',
   createdAt: new Date().toISOString(),
 };
@@ -46,7 +46,7 @@ const DEMO_AUTH: AuthResponse = {
   token: 'demo-token',
   userId: 'demo-user-001',
   name: 'Utilizador Demo',
-  reputationScore: 120,
+  reputationScore: 0,
   refreshToken: undefined,
 };
 
@@ -105,9 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loginAsDemo = useCallback(() => {
-    setAuthInfo(DEMO_AUTH);
-    setUser(DEMO_USER);
+  const loginAsDemo = useCallback((name?: string) => {
+    const displayName = name?.trim() || 'Utilizador Demo';
+    setAuthInfo({ ...DEMO_AUTH, name: displayName });
+    setUser({ ...DEMO_USER, name: displayName });
   }, []);
 
   const logout = useCallback(async () => {

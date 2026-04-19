@@ -33,8 +33,8 @@ public class StatusReportControllerTests : IClassFixture<CustomWebApplicationFac
                 CreatedAt = DateTime.UtcNow
             });
 
-        var response = await _client.PostAsJsonAsync("/api/Auth/login", new LoginDto("+244923111111"));
-        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/Auth/login", new LoginDto("+244923111111"));
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>(TestHelpers.SnakeCaseJson);
         return auth!.Token;
     }
 
@@ -48,7 +48,7 @@ public class StatusReportControllerTests : IClassFixture<CustomWebApplicationFac
 
         var dto = new CreateStatusReportDto("atm1", null, HasCash: true);
 
-        var response = await _client.PostAsJsonAsync("/api/StatusReport", dto);
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/StatusReport", dto);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -64,7 +64,7 @@ public class StatusReportControllerTests : IClassFixture<CustomWebApplicationFac
             .ReturnsAsync((ATM?)null);
 
         var dto = new CreateStatusReportDto("nonexistent", "user1", HasCash: true);
-        var response = await _client.PostAsJsonAsync("/api/StatusReport", dto);
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/StatusReport", dto);
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
 

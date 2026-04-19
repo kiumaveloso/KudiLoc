@@ -51,9 +51,10 @@ public class ATMServiceTests
     }
 
     [Fact]
-    public async Task GetNearbyATMsWithCash_OnlyReturnsATMsWithCash()
+    public async Task GetNearbyATMsWithCash_ReturnsAllNearbyATMs_SortedByCashThenReliability()
     {
-        // Arrange
+        // Arrange — the service returns ALL nearby ATMs (filtering is done client-side)
+        // but sorts: ATMs with cash first, then by reliability score descending.
         var testATMs = new List<ATM>
         {
             CreateTestATM("1", "ATM With Cash", hasCash: true, reliabilityScore: 80),
@@ -67,16 +68,19 @@ public class ATMServiceTests
         // Act
         var result = await _service.GetNearbyATMsWithCashAsync(-8.8, 13.2, 10);
 
-        // Assert
-        result.Should().HaveCount(1);
+        // Assert — both ATMs are returned; the one with cash comes first
+        result.Should().HaveCount(2);
         result[0].Name.Should().Be("ATM With Cash");
         result[0].Status.HasCash.Should().BeTrue();
+        result[1].Name.Should().Be("ATM Without Cash");
+        result[1].Status.HasCash.Should().BeFalse();
     }
 
     [Fact]
-    public async Task GetNearbyATMsWithCash_FiltersLowReliabilityATMs()
+    public async Task GetNearbyATMsWithCash_ReturnsAllRegardlessOfReliability()
     {
-        // Arrange
+        // Arrange — the service no longer filters by reliability; it returns all
+        // nearby ATMs sorted by cash availability then reliability score.
         var testATMs = new List<ATM>
         {
             CreateTestATM("1", "High Reliability", hasCash: true, reliabilityScore: 80),
@@ -90,10 +94,12 @@ public class ATMServiceTests
         // Act
         var result = await _service.GetNearbyATMsWithCashAsync(-8.8, 13.2, 10);
 
-        // Assert
-        result.Should().HaveCount(1);
+        // Assert — both returned, sorted by reliability score descending
+        result.Should().HaveCount(2);
         result[0].Name.Should().Be("High Reliability");
-        result[0].Status.ReliabilityScore.Should().BeGreaterThanOrEqualTo(30);
+        result[0].Status.ReliabilityScore.Should().Be(80);
+        result[1].Name.Should().Be("Low Reliability");
+        result[1].Status.ReliabilityScore.Should().Be(25);
     }
 
     [Fact]

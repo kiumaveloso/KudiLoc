@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
-// Profile & Definições — dark green card, gamification levels
+// Profile & Definições — dark green card, gamification levels, photo upload
 // ---------------------------------------------------------------------------
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,10 @@ import {
   ScrollView,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,10 +29,25 @@ import {
 import { useAuth } from '../../src/context/AuthContext';
 import LoadingScreen from '../../src/components/LoadingScreen';
 
+const AVATAR_KEY = 'kudiloc_avatar_uri';
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { loading, user, isAuthenticated, logout } = useAuth();
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+
+  // Load saved avatar on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const uri = Platform.OS === 'web'
+          ? localStorage.getItem(AVATAR_KEY)
+          : await SecureStore.getItemAsync(AVATAR_KEY);
+        if (uri) setAvatarUri(uri);
+      } catch { /* ignore */ }
+    })();
+  }, []);
 
   const handleLogout = () => {
     if (Platform.OS === 'web') { logout(); return; }
@@ -39,19 +57,39 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const handlePickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão necessária', 'Precisamos de acesso à galeria para alterar a foto de perfil.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets[0]?.uri) {
+      const uri = result.assets[0].uri;
+      setAvatarUri(uri);
+      try {
+        if (Platform.OS === 'web') localStorage.setItem(AVATAR_KEY, uri);
+        else await SecureStore.setItemAsync(AVATAR_KEY, uri);
+      } catch { /* ignore */ }
+    }
+  };
+
   if (loading) return <LoadingScreen />;
 
   if (!isAuthenticated || !user) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.notAuthContainer}>
-          <Ionicons name="person-circle-outline" size={72} color={Colors.textMuted} />
-          <Text style={styles.notAuthTitle}>Sem sessão iniciada</Text>
-          <Text style={styles.notAuthSub}>Inicia sessão para ver o teu perfil e contribuir.</Text>
-          <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/login')}>
-            <Text style={styles.loginBtnText}>Iniciar Sessão</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={[styles.container, styles.notAuthContainer, { paddingTop: insets.top }]}>
+        <Ionicons name="person-circle-outline" size={72} color={Colors.textMuted} />
+        <Text style={styles.notAuthTitle}>Sem sessão iniciada</Text>
+        <Text style={styles.notAuthSub}>Inicia sessão para ver o teu perfil e contribuir.</Text>
+        <TouchableOpacity style={styles.loginBtn} onPress={() => router.push('/login')}>
+          <Text style={styles.loginBtnText}>Iniciar Sessão</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -65,26 +103,40 @@ export default function ProfileScreen() {
   const pointsToNext = nextLevel ? nextLevel.minPoints - points : 0;
 
   const initial = (user.name ?? 'U').charAt(0).toUpperCase();
+  const displayName = user.name ?? `Utilizador ${user.id.slice(-4)}`;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={[styles.scroll, { paddingTop: insets.top, paddingBottom: insets.bottom + 100 }]}
+      bounces
+    >
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Perfil</Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* ---------------------------------------------------------------- */}
         {/* Dark green card */}
         {/* ---------------------------------------------------------------- */}
         <View style={styles.profileCard}>
-          {/* Avatar */}
+          {/* Avatar with upload button */}
           <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initial}</Text>
-            </View>
+            <TouchableOpacity style={styles.avatarContainer} onPress={handlePickPhoto} activeOpacity={0.8}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initial}</Text>
+                </View>
+              )}
+              <View style={styles.avatarEditBadge}>
+                <Ionicons name="camera" size={11} color={Colors.white} />
+              </View>
+            </TouchableOpacity>
             <View style={styles.nameCol}>
-              <Text style={styles.userName}>{user.name ?? `Utilizador ${user.id.slice(-4)}`}</Text>
+              <Text style={styles.userName}>{displayName}</Text>
               {/* Level badge */}
               <View style={[styles.levelBadge, { borderColor: level.color + '80' }]}>
                 <Ionicons name={level.icon as any} size={12} color={level.color} />
@@ -173,8 +225,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         <Text style={styles.poweredBy}>Powered by Kudivila</Text>
-      </ScrollView>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -209,8 +260,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    marginHorizontal: -Spacing.lg,
+    marginBottom: Spacing.md,
   },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: {
     flex: 1,
     fontSize: FontSize.lg,
@@ -220,8 +272,7 @@ const styles = StyleSheet.create({
   },
 
   scroll: {
-    padding: Spacing.lg,
-    paddingBottom: 100,
+    paddingHorizontal: Spacing.lg,
     gap: Spacing.md,
   },
 
@@ -237,18 +288,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.lg,
   },
+  avatarContainer: {
+    position: 'relative',
+  },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: Colors.noCashGold,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   avatarText: {
     fontSize: FontSize.xxl,
     fontWeight: '700',
     color: Colors.white,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.primaryDark,
   },
   nameCol: { flex: 1, gap: 6 },
   userName: {

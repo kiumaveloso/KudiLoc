@@ -20,7 +20,7 @@ public class ATMControllerTests : IClassFixture<CustomWebApplicationFactory>
         _client = factory.CreateClient();
     }
 
-    private async Task<string> GetAuthToken()
+    private async Task<string> GetAuthToken(string role = "user")
     {
         _factory.MockUserRepository
             .Setup(r => r.GetByPhoneNumberAsync("+244923111111"))
@@ -30,11 +30,12 @@ public class ATMControllerTests : IClassFixture<CustomWebApplicationFactory>
                 PhoneNumber = "+244923111111",
                 Name = "Auth User",
                 ReputationScore = 80,
+                Role = role,
                 CreatedAt = DateTime.UtcNow
             });
 
-        var response = await _client.PostAsJsonAsync("/api/Auth/login", new LoginDto("+244923111111"));
-        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/Auth/login", new LoginDto("+244923111111"));
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>(TestHelpers.SnakeCaseJson);
         return auth!.Token;
     }
 
@@ -143,29 +144,25 @@ public class ATMControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task CreateATM_WithoutAuth_ReturnsSuccess()
+    public async Task CreateATM_WithoutAuth_ReturnsUnauthorized()
     {
-        // Arrange - POST /api/atm is now AllowAnonymous for kudi-cash-find compatibility
-        _factory.MockATMRepository
-            .Setup(r => r.CreateAsync(It.IsAny<ATM>()))
-            .ReturnsAsync((ATM a) => { a.Id = "anon-atm-id"; return a; });
-
+        // Arrange - POST /api/atm requires Admin role
         var dto = new CreateATMDto(
             "New ATM", "BFA", -8.838, 13.234, null, "Luanda", "Luanda",
             "Rua Nova", "Centro", null, new List<string> { "Levantamento" }, null);
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/ATM", dto);
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/ATM", dto);
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
     public async Task CreateATM_WithAuth_ReturnsCreated()
     {
-        // Arrange
-        var token = await GetAuthToken();
+        // Arrange - requires Admin role
+        var token = await GetAuthToken("Admin");
         _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         _factory.MockATMRepository
@@ -177,7 +174,7 @@ public class ATMControllerTests : IClassFixture<CustomWebApplicationFactory>
             "Rua Nova", "Centro", null, new List<string> { "Levantamento" }, null);
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/ATM", dto);
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/ATM", dto);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);

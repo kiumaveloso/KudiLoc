@@ -10,6 +10,7 @@ public interface IUserService
     Task<UserDto?> GetUserByPhoneNumberAsync(string phoneNumber);
     Task<UserDto> CreateUserAsync(CreateUserDto dto);
     Task<UserDto> UpdateUserAsync(string id, UpdateUserDto dto);
+    Task<UserDto> AssignRoleAsync(string id, string role);
     Task<bool> DeleteUserAsync(string id);
 }
 
@@ -69,6 +70,21 @@ public class UserService : IUserService
             user.Name = dto.Name;
         }
 
+        var updated = await _userRepository.UpdateAsync(user);
+        return MapToDto(updated);
+    }
+
+    public async Task<UserDto> AssignRoleAsync(string id, string role)
+    {
+        var allowed = new[] { "user", "Admin" };
+        if (!allowed.Contains(role))
+            throw new ArgumentException($"Role inválido. Valores permitidos: {string.Join(", ", allowed)}");
+
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null)
+            throw new ArgumentException("Utilizador não encontrado");
+
+        user.Role = role;
         var updated = await _userRepository.UpdateAsync(user);
         return MapToDto(updated);
     }

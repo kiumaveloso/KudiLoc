@@ -68,12 +68,13 @@ export default function LoginScreen() {
     try {
       const res = await requestOtp(fullPhone);
       setCountdown(res.expiresInSeconds ?? 300);
-      setStep('otp');
-      setTimeout(() => otpRefs.current[0]?.focus(), 300);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erro ao enviar código.');
+    } catch {
+      // API unavailable — still show OTP screen so the demo code 123456 works
+      setCountdown(300);
     } finally {
       setLoading(false);
+      setStep('otp');
+      setTimeout(() => otpRefs.current[0]?.focus(), 300);
     }
   };
 
@@ -98,14 +99,14 @@ export default function LoginScreen() {
   const submitOtp = async (code: string) => {
     // Demo shortcut — any phone + 123456 logs in as demo
     if (code === '123456') {
-      loginAsDemo();
+      loginAsDemo(name);
       router.replace('/(tabs)');
       return;
     }
     setLoading(true);
     setError('');
     try {
-      const auth = await verifyOtp(fullPhone, code);
+      const auth = await verifyOtp(fullPhone, code, name || undefined);
       onLoginSuccess(auth);
       router.replace('/(tabs)');
     } catch (e: unknown) {
@@ -206,20 +207,6 @@ export default function LoginScreen() {
               </TouchableOpacity>
 
               <Text style={styles.hint}>Vamos enviar um código de verificação por SMS</Text>
-
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerLabel}>ou</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <TouchableOpacity
-                style={styles.demoBtn}
-                onPress={() => { loginAsDemo(); router.replace('/(tabs)'); }}
-              >
-                <Ionicons name="flask-outline" size={16} color="rgba(255,255,255,0.8)" />
-                <Text style={styles.demoBtnText}>Entrar como Demo</Text>
-              </TouchableOpacity>
             </>
           )}
 
@@ -316,7 +303,6 @@ export default function LoginScreen() {
                 </View>
               )}
 
-              <Text style={styles.footerNote}>Código de teste: 123456</Text>
             </>
           )}
         </ScrollView>
@@ -491,13 +477,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.75)',
     fontSize: FontSize.md,
   },
-  footerNote: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: FontSize.xs,
-    textAlign: 'center',
-    marginTop: Spacing.xl,
-  },
-
   // Primary button
   btn: {
     backgroundColor: Colors.white,
@@ -527,37 +506,4 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
 
-  // Divider
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.xl,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
-  dividerLabel: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: FontSize.sm,
-  },
-
-  // Demo
-  demoBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.lg,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  demoBtnText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: FontSize.md,
-    fontWeight: '500',
-  },
 });

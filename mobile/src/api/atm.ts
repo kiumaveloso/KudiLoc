@@ -32,6 +32,36 @@ export async function getATMById(id: string): Promise<ATMDto> {
   return apiFetch<ATMDto>(`/atm/${id}`);
 }
 
+/** Create a new ATM (Admin only). */
+export async function createATM(dto: {
+  name: string;
+  bankName: string;
+  latitude: number;
+  longitude: number;
+  locationName?: string;
+  province?: string;
+  municipality?: string;
+  street?: string;
+  neighborhood?: string;
+  landmark?: string;
+}): Promise<ATMDto> {
+  return apiFetch<ATMDto>('/atm', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: dto.name,
+      bank_name: dto.bankName,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      location_name: dto.locationName,
+      province: dto.province,
+      municipality: dto.municipality,
+      street: dto.street,
+      neighborhood: dto.neighborhood,
+      landmark: dto.landmark,
+    }),
+  });
+}
+
 /** Search ATMs by text query. */
 export async function searchATMs(
   query: string,

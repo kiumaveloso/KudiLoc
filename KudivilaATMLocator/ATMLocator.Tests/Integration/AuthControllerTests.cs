@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using ATMLocator.Application.DTOs;
 using ATMLocator.Core.Entities;
 using FluentAssertions;
@@ -34,11 +35,11 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         var dto = new CreateUserDto("+244923000001", "Test User");
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Auth/register", dto);
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/Auth/register", dto);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var content = await response.Content.ReadFromJsonAsync<AuthResponseDto>(TestHelpers.SnakeCaseJson);
         content.Should().NotBeNull();
         content!.Token.Should().NotBeNullOrEmpty();
         content.PhoneNumber.Should().Be("+244923000001");
@@ -62,7 +63,7 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         var dto = new CreateUserDto("+244923000002", "Duplicate User");
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Auth/register", dto);
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/Auth/register", dto);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -86,11 +87,11 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         var dto = new LoginDto("+244923000003");
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Auth/login", dto);
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/Auth/login", dto);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var content = await response.Content.ReadFromJsonAsync<AuthResponseDto>(TestHelpers.SnakeCaseJson);
         content.Should().NotBeNull();
         content!.Token.Should().NotBeNullOrEmpty();
         content.UserId.Should().Be("user-123");
@@ -107,7 +108,7 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         var dto = new LoginDto("+244923000004");
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/Auth/login", dto);
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/Auth/login", dto);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);

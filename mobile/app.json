@@ -18,7 +18,9 @@
       "bundleIdentifier": "com.kudivila.kudiloc",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "KudiLoc precisa da sua localização para encontrar ATMs próximos.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "KudiLoc precisa da sua localização para encontrar ATMs próximos."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "KudiLoc precisa da sua localização para encontrar ATMs próximos.",
+        "NSPhotoLibraryUsageDescription": "Permite alterar a tua foto de perfil.",
+        "NSCameraUsageDescription": "Permite tirar uma foto para o teu perfil."
       }
     },
     "android": {
@@ -50,6 +52,13 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "KudiLoc precisa da sua localização para encontrar ATMs próximos."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite alterar a tua foto de perfil.",
+          "cameraPermission": "Permite tirar uma foto para o teu perfil."
         }
       ]
     ]

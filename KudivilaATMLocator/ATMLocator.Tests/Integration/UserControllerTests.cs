@@ -33,8 +33,8 @@ public class UserControllerTests : IClassFixture<CustomWebApplicationFactory>
                 CreatedAt = DateTime.UtcNow
             });
 
-        var response = await _client.PostAsJsonAsync("/api/Auth/login", new LoginDto("+244923111111"));
-        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/Auth/login", new LoginDto("+244923111111"));
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>(TestHelpers.SnakeCaseJson);
         return auth!.Token;
     }
 
@@ -100,7 +100,7 @@ public class UserControllerTests : IClassFixture<CustomWebApplicationFactory>
         _factory.MockUserRepository.Setup(r => r.UpdateAsync(It.IsAny<User>()))
             .ReturnsAsync((User u) => u);
 
-        var response = await _client.PutAsJsonAsync("/api/User/user1", new UpdateUserDto("New Name"));
+        var response = await _client.PutAsSnakeCaseJsonAsync("/api/User/user1", new UpdateUserDto("New Name"));
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 

@@ -23,12 +23,13 @@ export async function requestOtp(phoneNumber: string): Promise<OtpResponse> {
 export async function verifyOtp(
   phoneNumber: string,
   otpCode: string,
+  name?: string,
 ): Promise<AuthResponse> {
   const res = await apiFetch<AuthResponse & { refreshToken?: string }>(
     '/auth/otp/verify',
     {
       method: 'POST',
-      body: JSON.stringify({ phone_number: phoneNumber, otp_code: otpCode }),
+      body: JSON.stringify({ phone_number: phoneNumber, otp_code: otpCode, name }),
       skipRetry: true,
     } as Parameters<typeof apiFetch>[1],
   );

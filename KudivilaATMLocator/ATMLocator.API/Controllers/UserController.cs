@@ -63,6 +63,26 @@ public class UserController : ControllerBase
         }
     }
 
+    [Authorize(Roles = "Admin")]
+    [HttpPut("{id}/role")]
+    public async Task<ActionResult<UserDto>> AssignRole(string id, [FromBody] AssignRoleDto dto)
+    {
+        try
+        {
+            var user = await _userService.AssignRoleAsync(id, dto.Role);
+            return Ok(user);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { statusCode = 400, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning role to user: {Id}", id);
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao atribuir role ao utilizador" });
+        }
+    }
+
     [Authorize]
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteUser(string id)

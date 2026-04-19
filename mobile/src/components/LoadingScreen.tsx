@@ -15,8 +15,8 @@ interface Props {
 export default function LoadingScreen({ message }: Props) {
   return (
     <View style={styles.container}>
-      <KudiLocLogo size="lg" />
-      <ActivityIndicator size="large" color={Colors.primary} style={styles.spinner} />
+      <KudiLocLogo size="lg" color={Colors.white} />
+      <ActivityIndicator size="large" color={Colors.white} style={styles.spinner} />
       <Text style={styles.text}>{message ?? pt.loading}</Text>
     </View>
   );
@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.primaryMedium,
   },
   spinner: {
     marginTop: Spacing.xl,
@@ -35,6 +35,6 @@ const styles = StyleSheet.create({
   text: {
     marginTop: Spacing.md,
     fontSize: FontSize.md,
-    color: Colors.textSecondary,
+    color: 'rgba(255,255,255,0.8)',
   },
 });

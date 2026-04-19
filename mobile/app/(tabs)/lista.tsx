@@ -21,6 +21,7 @@ import { useLocation } from '../../src/hooks/useLocation';
 import { KudiPin } from '../../src/components/KudiLocLogo';
 import { StatusLight } from '../../src/components/StatusLight';
 import { useFavourites } from '../../src/hooks/useFavourites';
+import { useAuth } from '../../src/context/AuthContext';
 import type { NearbyATMResult } from '../../src/types';
 
 type FilterKey = 'todos' | 'disponivel' | '500m' | 'favoritos';
@@ -36,6 +37,8 @@ export default function ListaScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const location = useLocation();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
 
   const [atms, setAtms] = useState<NearbyATMResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -194,6 +197,17 @@ export default function ListaScreen() {
           }
         />
       )}
+
+      {/* Admin FAB — Add ATM */}
+      {isAdmin && (
+        <TouchableOpacity
+          style={[styles.fab, { bottom: insets.bottom + 100 }]}
+          onPress={() => router.push('/admin/add-atm')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={26} color={Colors.white} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -202,6 +216,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+
+  // Admin FAB
+  fab: {
+    position: 'absolute',
+    right: Spacing.lg,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
   },
 
   // Header

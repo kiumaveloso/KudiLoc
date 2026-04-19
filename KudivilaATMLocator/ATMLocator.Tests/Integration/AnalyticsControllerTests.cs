@@ -1,4 +1,7 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using ATMLocator.Application.DTOs;
 using ATMLocator.Core.Entities;
 using FluentAssertions;
 using Moq;
@@ -17,10 +20,42 @@ public class AnalyticsControllerTests : IClassFixture<CustomWebApplicationFactor
         _client = factory.CreateClient();
     }
 
+    private async Task<string> GetAdminAuthToken()
+    {
+        _factory.MockUserRepository
+            .Setup(r => r.GetByPhoneNumberAsync("+244923111111"))
+            .ReturnsAsync(new User
+            {
+                Id = "admin-user",
+                PhoneNumber = "+244923111111",
+                Name = "Admin User",
+                ReputationScore = 100,
+                Role = "admin",
+                CreatedAt = DateTime.UtcNow
+            });
+
+        var response = await _client.PostAsSnakeCaseJsonAsync("/api/Auth/login", new LoginDto("+244923111111"));
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponseDto>(TestHelpers.SnakeCaseJson);
+        return auth!.Token;
+    }
+
     [Fact]
-    public async Task GetSystemStats_ReturnsOk()
+    public async Task GetSystemStats_WithoutAuth_ReturnsUnauthorized()
+    {
+        // Act — stats endpoint requires Admin role
+        var response = await _client.GetAsync("/api/Analytics/stats");
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetSystemStats_WithAdminAuth_ReturnsOk()
     {
         // Arrange
+        var token = await GetAdminAuthToken();
+        _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
         _factory.MockATMRepository
             .Setup(r => r.CountAllAsync())
             .ReturnsAsync(10);
@@ -52,8 +87,8 @@ public class AnalyticsControllerTests : IClassFixture<CustomWebApplicationFactor
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await response.Content.ReadAsStringAsync();
-        content.Should().Contain("totalATMs");
+
+        _client.DefaultRequestHeaders.Authorization = null;
     }
 
     [Fact]

@@ -114,11 +114,15 @@ public class ATMRepository : IATMRepository
     private static FilterDefinition<ATM> BuildSearchFilter(string searchTerm)
     {
         var escaped = Regex.Escape(searchTerm);
+        var regex = new MongoDB.Bson.BsonRegularExpression(escaped, "i");
         return Builders<ATM>.Filter.Or(
-            Builders<ATM>.Filter.Regex(atm => atm.Name, new MongoDB.Bson.BsonRegularExpression(escaped, "i")),
-            Builders<ATM>.Filter.Regex(atm => atm.BankName, new MongoDB.Bson.BsonRegularExpression(escaped, "i")),
-            Builders<ATM>.Filter.Regex(atm => atm.Address.Neighborhood, new MongoDB.Bson.BsonRegularExpression(escaped, "i")),
-            Builders<ATM>.Filter.Regex(atm => atm.Address.Landmark, new MongoDB.Bson.BsonRegularExpression(escaped, "i"))
+            Builders<ATM>.Filter.Regex(atm => atm.Name, regex),
+            Builders<ATM>.Filter.Regex(atm => atm.BankName, regex),
+            Builders<ATM>.Filter.Regex(atm => atm.Province, regex),
+            Builders<ATM>.Filter.Regex(atm => atm.Municipality, regex),
+            Builders<ATM>.Filter.Regex(atm => atm.Address.Street, regex),
+            Builders<ATM>.Filter.Regex(atm => atm.Address.Neighborhood, regex),
+            Builders<ATM>.Filter.Regex(atm => atm.Address.Landmark, regex)
         );
     }
 

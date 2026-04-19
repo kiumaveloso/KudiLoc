@@ -4,14 +4,18 @@ public class ApiKeyMiddleware(RequestDelegate next, IConfiguration configuration
 {
     private const string ApiKeyHeader = "X-API-Key";
 
-    // Paths that bypass the API key check
-    private static readonly string[] PublicPaths =
+    // Exact paths that bypass the API key check
+    private static readonly string[] ExactPublicPaths =
     [
+        "/",
         "/health",
-        "/health/db",
-        "/swagger",
-        "/swagger/",
-        "/"
+        "/health/db"
+    ];
+
+    // Prefix paths that bypass the API key check (any sub-path matches)
+    private static readonly string[] PrefixPublicPaths =
+    [
+        "/swagger"
     ];
 
     public async Task InvokeAsync(HttpContext context)
@@ -27,7 +31,8 @@ public class ApiKeyMiddleware(RequestDelegate next, IConfiguration configuration
 
         // Allow public paths through without a key
         var path = context.Request.Path.Value ?? string.Empty;
-        if (PublicPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+        if (ExactPublicPaths.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase))
+            || PrefixPublicPaths.Any(p => path.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
         {
             await next(context);
             return;

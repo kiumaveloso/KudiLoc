@@ -340,8 +340,11 @@ app.UseMiddleware<ApiKeyMiddleware>();
 // Correlation ID for request tracing (reads or generates X-Correlation-Id)
 app.UseMiddleware<CorrelationIdMiddleware>();
 
-// Response compression (gzip/brotli) - must be early before anything writes the body
-app.UseResponseCompression();
+// Response compression (gzip/brotli) - must be early before anything writes the body.
+// Skipped in Testing environment to avoid PipeWriter.UnflushedBytes errors in
+// WebApplicationFactory's test server (.NET 10).
+if (!app.Environment.IsEnvironment("Testing"))
+    app.UseResponseCompression();
 
 // Security headers on all responses
 app.UseMiddleware<SecurityHeadersMiddleware>();
@@ -354,6 +357,7 @@ app.UseSerilogRequestLogging();
 
 // Add custom middleware
 app.UseMiddleware<ErrorHandlingMiddleware>();
+
 app.UseResponseCaching();
 
 // Simple instant health check — returns 200 immediately so Render's health check

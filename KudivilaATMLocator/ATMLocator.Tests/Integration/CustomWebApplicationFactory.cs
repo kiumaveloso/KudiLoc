@@ -18,6 +18,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public Mock<IUserRepository> MockUserRepository { get; } = new();
     public Mock<IStatusReportRepository> MockStatusReportRepository { get; } = new();
     public Mock<IPhotoService> MockPhotoService { get; } = new();
+    public Mock<ICommentRepository> MockCommentRepository { get; } = new();
+    public Mock<IBadgeRepository> MockBadgeRepository { get; } = new();
+    public Mock<IVisitHistoryRepository> MockVisitHistoryRepository { get; } = new();
+    public Mock<IRefreshTokenRepository> MockRefreshTokenRepository { get; } = new();
+    public Mock<IOtpRepository> MockOtpRepository { get; } = new();
+    public Mock<ILoginAuditRepository> MockLoginAuditRepository { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -28,29 +34,41 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Encryption:Key"] = "dGVzdGluZ2tleXRoYXRpczMyYnl0ZXNsb25nIQ==",
-                ["Encryption:HmacKey"] = "dGVzdGluZ2htYWNrZXl0aGF0aXMzMmJ5dGVzbG9uZw==",
+                ["Encryption:Key"] = "CYqx2dXUp8ztrUBTvKsvA0rY219I7wzM5Ocwmsh/mkY=",
+                ["Encryption:HmacKey"] = "HKoF3OrR118hgZQAJ4Eg2Q9fzDus0+KfCQoFw/0XBRs=",
             });
         });
 
         builder.ConfigureServices(services =>
         {
-            // Remove real repository registrations
-            RemoveService<IATMRepository>(services);
-            RemoveService<IStatusReportRepository>(services);
-            RemoveService<IUserRepository>(services);
-            RemoveService<IPhotoService>(services);
-
             // Remove MongoDbContext and MongoDbHealthCheck to avoid connecting to
             // real MongoDB during integration tests.
             RemoveService<MongoDbContext>(services);
             RemoveHealthCheck(services, "mongodb");
 
-            // Add mocks
+            // Remove ALL real repository and service registrations that depend on MongoDbContext
+            RemoveService<IATMRepository>(services);
+            RemoveService<IStatusReportRepository>(services);
+            RemoveService<IUserRepository>(services);
+            RemoveService<IPhotoService>(services);
+            RemoveService<ICommentRepository>(services);
+            RemoveService<IBadgeRepository>(services);
+            RemoveService<IVisitHistoryRepository>(services);
+            RemoveService<IRefreshTokenRepository>(services);
+            RemoveService<IOtpRepository>(services);
+            RemoveService<ILoginAuditRepository>(services);
+
+            // Add mocks for all repositories
             services.AddSingleton(MockATMRepository.Object);
             services.AddSingleton(MockUserRepository.Object);
             services.AddSingleton(MockStatusReportRepository.Object);
             services.AddSingleton(MockPhotoService.Object);
+            services.AddSingleton(MockCommentRepository.Object);
+            services.AddSingleton(MockBadgeRepository.Object);
+            services.AddSingleton(MockVisitHistoryRepository.Object);
+            services.AddSingleton(MockRefreshTokenRepository.Object);
+            services.AddSingleton(MockOtpRepository.Object);
+            services.AddSingleton(MockLoginAuditRepository.Object);
         });
     }
 

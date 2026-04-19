@@ -159,7 +159,7 @@ public class AuthController : ControllerBase
             }
             catch (UnauthorizedAccessException)
             {
-                result = await _authService.RegisterAsync(dto.PhoneNumber, null);
+                result = await _authService.RegisterAsync(dto.PhoneNumber, dto.Name);
             }
 
             // Generate refresh token and set as httpOnly cookie
@@ -282,6 +282,32 @@ public class AuthController : ControllerBase
         }
 
         return Ok(user);
+    }
+
+    /// <summary>
+    /// One-time bootstrap: promote a user to Admin using a secret token.
+    /// Set BOOTSTRAP_SECRET env var on Render. Remove or leave unset to disable.
+    /// POST /api/auth/bootstrap-admin
+    /// Body: { "secret": "...", "phone_number": "+244..." }
+    /// </summary>
+    [AllowAnonymous]
+    [HttpPost("bootstrap-admin")]
+    public async Task<IActionResult> BootstrapAdmin([FromBody] BootstrapAdminDto dto)
+    {
+        var secret = Environment.GetEnvironmentVariable("BOOTSTRAP_SECRET");
+        if (string.IsNullOrEmpty(secret))
+            return NotFound(); // endpoint disabled when env var not set
+
+        if (dto.Secret != secret)
+            return Unauthorized(new { message = "Token inválido." });
+
+        var user = await _userService.GetUserByPhoneNumberAsync(dto.PhoneNumber);
+        if (user == null)
+            return NotFound(new { message = "Utilizador não encontrado." });
+
+        await _userService.AssignRoleAsync(user.Id, "Admin");
+        _logger.LogInformation("Bootstrap: user {Id} promoted to Admin", user.Id);
+        return Ok(new { message = $"Utilizador {user.Name ?? user.Id} é agora Admin." });
     }
 
     // -----------------------------------------------------------------------
