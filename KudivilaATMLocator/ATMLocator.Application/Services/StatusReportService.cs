@@ -27,6 +27,7 @@ public class StatusReportService : IStatusReportService
     private readonly IATMRepository _atmRepository;
     private readonly IUserRepository _userRepository;
     private readonly IBadgeService _badgeService;
+    private readonly ICacheService _cache;
     private readonly ReportSettings _settings;
 
     public StatusReportService(
@@ -34,12 +35,14 @@ public class StatusReportService : IStatusReportService
         IATMRepository atmRepository,
         IUserRepository userRepository,
         IBadgeService badgeService,
+        ICacheService cache,
         IOptions<ReportSettings> settings)
     {
         _reportRepository = reportRepository;
         _atmRepository = atmRepository;
         _userRepository = userRepository;
         _badgeService = badgeService;
+        _cache = cache;
         _settings = settings.Value;
     }
 
@@ -245,6 +248,12 @@ public class StatusReportService : IStatusReportService
         };
 
         await _atmRepository.UpdateAsync(atm);
+
+        // Invalidate Redis cache so next fetch reflects the new status immediately
+        await _cache.RemoveAsync($"atm:{atm.Id}");
+        await _cache.RemoveAsync("atms:all");
+        if (!string.IsNullOrEmpty(atm.Province))
+            await _cache.RemoveAsync($"atms:province:{atm.Province}");
 
         // Mark reports as verified or rejected
         await UpdateReportStatuses(recentReports, hasMoneyNow);

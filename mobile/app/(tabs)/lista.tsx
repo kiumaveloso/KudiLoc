@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   View,
   Text,
@@ -17,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Radius, Spacing, atmMarkerColor } from '../../src/constants/theme';
 import { getNearbyATMs } from '../../src/api/atm';
+import { getLocalAtms, removeLocalAtm } from '../../src/store/localAtms';
 import { useLocation } from '../../src/hooks/useLocation';
 import { KudiPin } from '../../src/components/KudiLocLogo';
 import { StatusLight } from '../../src/components/StatusLight';
@@ -52,7 +54,11 @@ export default function ListaScreen() {
     setError(false);
     try {
       const res = await getNearbyATMs(location.latitude, location.longitude, 10);
-      setAtms(res.atms);
+      // Merge real ATMs with any locally-added demo ATMs (dedup by id)
+      const local = getLocalAtms();
+      const realIds = new Set(res.atms.map((a) => a.id));
+      const extras = local.filter((a) => !realIds.has(a.id));
+      setAtms([...extras, ...res.atms]);
     } catch {
       setError(true);
     } finally {
@@ -62,6 +68,11 @@ export default function ListaScreen() {
   }, [location.latitude, location.longitude, location.loading]);
 
   useEffect(() => { if (!location.loading) fetchNearby(); }, [fetchNearby, location.loading]);
+
+  // Refresh list when returning from add-atm or ATM detail (after delete)
+  useFocusEffect(useCallback(() => {
+    fetchNearby();
+  }, [fetchNearby]));
 
   const filtered = atms.filter((a) => {
     if (filter === 'disponivel') return a.status.hasCash && a.status.operationalStatus?.toLowerCase() !== 'offline';

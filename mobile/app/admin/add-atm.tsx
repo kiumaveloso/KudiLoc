@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Radius, Spacing } from '../../src/constants/theme';
 import { createATM } from '../../src/api/atm';
+import { addLocalAtm } from '../../src/store/localAtms';
 import { useLocation } from '../../src/hooks/useLocation';
 import { useAuth } from '../../src/context/AuthContext';
 
@@ -71,21 +72,56 @@ export default function AddATMScreen() {
     !isNaN(Number(lat)) &&
     !isNaN(Number(lng));
 
+  const isDemo = user?.id === 'demo-user-001';
+
   const handleSubmit = async () => {
     if (!isValid) return;
     setLoading(true);
     try {
-      await createATM({
-        name: name.trim(),
-        bankName: bankName.trim(),
-        latitude: Number(lat),
-        longitude: Number(lng),
-        province: province.trim() || undefined,
-        municipality: municipality.trim() || undefined,
-        neighborhood: neighborhood.trim() || undefined,
-        street: street.trim() || undefined,
-        landmark: landmark.trim() || undefined,
-      });
+      if (isDemo) {
+        await new Promise((r) => setTimeout(r, 600));
+        // Add to local store so it appears immediately in map/list
+        addLocalAtm({
+          id: `demo-${Date.now()}`,
+          name: name.trim(),
+          bankName: bankName.trim(),
+          location: {
+            latitude: Number(lat),
+            longitude: Number(lng),
+            province: province.trim() || 'Luanda',
+            municipality: municipality.trim() || '',
+          },
+          status: {
+            hasCash: true,
+            hasMoney: true,
+            hasPaper: true,
+            operationalStatus: 'Operational',
+            reliabilityScore: 0,
+            lastVerified: new Date().toISOString(),
+            statusDescription: 'Recém adicionado',
+            totalReports: 0,
+          },
+          address: {
+            street: street.trim() || '',
+            neighborhood: neighborhood.trim() || '',
+            landmark: landmark.trim() || undefined,
+          },
+          distanceKm: 0,
+          estimatedWalkingTime: 0,
+        });
+      } else {
+        await createATM({
+          name: name.trim(),
+          bankName: bankName.trim(),
+          latitude: Number(lat),
+          longitude: Number(lng),
+          province: province.trim() || undefined,
+          municipality: municipality.trim() || undefined,
+          neighborhood: neighborhood.trim() || undefined,
+          street: street.trim() || undefined,
+          landmark: landmark.trim() || undefined,
+        });
+      }
       Alert.alert('ATM adicionado', `"${name}" foi adicionado com sucesso.`, [
         { text: 'OK', onPress: () => router.back() },
       ]);

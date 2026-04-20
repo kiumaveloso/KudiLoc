@@ -62,6 +62,11 @@ export async function createATM(dto: {
   });
 }
 
+/** Delete an ATM (Admin only). */
+export async function deleteATM(id: string): Promise<void> {
+  return apiFetch<void>(`/atm/${id}`, { method: 'DELETE' });
+}
+
 /** Search ATMs by text query. */
 export async function searchATMs(
   query: string,

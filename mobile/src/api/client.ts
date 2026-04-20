@@ -11,6 +11,8 @@ import { Platform } from 'react-native';
 const API_BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:5000/api';
 
+const API_KEY = process.env.EXPO_PUBLIC_API_KEY ?? '';
+
 const TOKEN_KEY = 'kudiloc_access_token';
 const REFRESH_TOKEN_KEY = 'kudiloc_refresh_token';
 
@@ -154,8 +156,11 @@ export async function apiFetch<T = unknown>(
   if (!headers['Content-Type'] && init.body && typeof init.body === 'string') {
     headers['Content-Type'] = 'application/json';
   }
-  if (accessToken) {
+  if (accessToken && accessToken !== 'demo-token') {
     headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  if (API_KEY) {
+    headers['X-API-Key'] = API_KEY;
   }
 
   const url = `${API_BASE}${path}`;
@@ -213,6 +218,7 @@ async function tryRefreshToken(): Promise<boolean> {
     const refreshTok = await getRefreshToken();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
     };
     const body = refreshTok ? JSON.stringify({ refresh_token: refreshTok }) : undefined;
 

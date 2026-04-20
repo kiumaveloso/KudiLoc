@@ -18,6 +18,7 @@ import {
   Animated,
   Share,
   Linking,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,7 +31,9 @@ import {
   getATMComments,
   addComment,
   submitStatusReport,
+  deleteATM,
 } from '../../../src/api/atm';
+import { removeLocalAtm, getLocalAtms } from '../../../src/store/localAtms';
 import { useAuth } from '../../../src/context/AuthContext';
 import { useFavourites } from '../../../src/hooks/useFavourites';
 import LoadingScreen from '../../../src/components/LoadingScreen';
@@ -98,7 +101,23 @@ export default function ATMDetailScreen() {
       setAtm(atmData);
       setComments(commentsData);
     } catch {
-      // silent
+      // For locally-added demo ATMs, fall back to the local store
+      const local = getLocalAtms().find((a) => a.id === id);
+      if (local) {
+        setAtm({
+          id: local.id,
+          name: local.name,
+          bankName: local.bankName,
+          location: local.location,
+          coordinates: [local.location.longitude, local.location.latitude],
+          hasMoney: local.status.hasCash,
+          hasPaper: local.status.hasPaper,
+          status: local.status,
+          address: local.address,
+          supportedServices: [],
+          photoUrls: [],
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -144,29 +163,79 @@ export default function ATMDetailScreen() {
     setReportVisible(true);
   };
 
-  const handleSubmitReport = async () => {
-    if (!reportCash || !id) return;
+  const applyReportToLocalState = (cash: 'has' | 'no' | 'offline') => {
+    setAtm((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        status: {
+          ...prev.status,
+          hasCash: cash === 'has',
+          hasMoney: cash === 'has',
+          operationalStatus: cash === 'offline' ? 'Offline' : 'Operational',
+          lastVerified: new Date().toISOString(),
+        },
+      };
+    });
+  };
+
+  const handleSubmitReport = async (cashOverride?: 'has' | 'no' | 'offline') => {
+    const cash = cashOverride ?? reportCash;
+    if (!cash || !id) return;
     setReportSubmitting(true);
     try {
-      // Demo users — show success without hitting the API
       if (!user || IS_DEMO(user.id)) {
+        // Demo mode — update local state immediately
+        applyReportToLocalState(cash);
         setReportSuccess(true);
-        setTimeout(() => { setReportVisible(false); fetchAll(); }, 2000);
+        setTimeout(() => { setReportVisible(false); }, 2000);
         return;
       }
       const report: CreateStatusReport = {
         atmId: id,
         userId: user?.id,
-        hasCash: reportCash === 'has',
+        hasCash: cash === 'has',
         hasPaper: reportPaper ?? undefined,
-        operationalStatus: reportCash === 'offline' ? 'Offline' : 'Operational',
+        operationalStatus: cash === 'offline' ? 'Offline' : 'Operational',
       };
       await submitStatusReport(report);
+      // Apply optimistic update immediately, then confirm from server
+      applyReportToLocalState(cash);
       setReportSuccess(true);
       setTimeout(() => { setReportVisible(false); fetchAll(); }, 2000);
     } catch { /* silent */ } finally {
       setReportSubmitting(false);
     }
+  };
+
+  const isAdmin = user?.role === 'Admin';
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Eliminar ATM',
+      `Tens a certeza que queres eliminar "${atm?.name}"? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            if (!id) return;
+            try {
+              if (IS_DEMO(user?.id)) {
+                removeLocalAtm(id);
+                router.back();
+                return;
+              }
+              await deleteATM(id);
+              router.back();
+            } catch (e: any) {
+              Alert.alert('Erro', e?.message ?? 'Não foi possível eliminar o ATM.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleShare = async () => {
@@ -220,7 +289,13 @@ export default function ATMDetailScreen() {
             <Ionicons name="arrow-back" size={22} color={Colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Detalhes do Multicaixa</Text>
-          <View style={{ width: 40 }} />
+          {isAdmin ? (
+            <TouchableOpacity onPress={handleDelete} style={styles.deleteBtn}>
+              <Ionicons name="trash-outline" size={20} color={Colors.red} />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -324,8 +399,8 @@ export default function ATMDetailScreen() {
             </TouchableOpacity>
             <View style={styles.actionDivider} />
             <TouchableOpacity style={styles.actionBtn} onPress={() => id && toggleFav(id)}>
-              <Ionicons name={id && isFav(id) ? 'bookmark' : 'bookmark-outline'} size={18} color={id && isFav(id) ? Colors.primary : Colors.text} />
-              <Text style={[styles.actionBtnText, id && isFav(id) && { color: Colors.primary }]}>Guardar</Text>
+              <Ionicons name={id && isFav(id) ? 'star' : 'star-outline'} size={18} color={id && isFav(id) ? Colors.noCashGold : Colors.text} />
+              <Text style={[styles.actionBtnText, id && isFav(id) && { color: Colors.noCashGold }]}>Favorito</Text>
             </TouchableOpacity>
             <View style={styles.actionDivider} />
             <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
@@ -444,7 +519,7 @@ export default function ATMDetailScreen() {
                 </View>
                 <TouchableOpacity
                   style={[styles.sheetToggleFull, reportCash === 'offline' && styles.sheetToggleActiveAmber]}
-                  onPress={() => setReportCash('offline')}
+                  onPress={() => { setReportCash('offline'); handleSubmitReport('offline'); }}
                 >
                   <Ionicons name="warning-outline" size={16} color={reportCash === 'offline' ? Colors.noCashGold : Colors.textMuted} />
                   <Text style={[styles.sheetToggleText, reportCash === 'offline' && { color: Colors.noCashGold }]}>Fora de serviço</Text>
@@ -514,6 +589,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  deleteBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   headerTitle: {
     flex: 1,
     fontSize: FontSize.lg,

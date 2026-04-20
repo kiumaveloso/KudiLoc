@@ -15,10 +15,12 @@ import {
   Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Radius, Spacing, atmMarkerColor } from '../../src/constants/theme';
+import { KudiPin } from '../../src/components/KudiLocLogo';
 import { getNearbyATMs, searchATMs } from '../../src/api/atm';
+import { getLocalAtms } from '../../src/store/localAtms';
 import { useLocation } from '../../src/hooks/useLocation';
 import { StatusLight } from '../../src/components/StatusLight';
 import LoadingScreen from '../../src/components/LoadingScreen';
@@ -154,7 +156,10 @@ export default function MapScreen() {
         location.longitude,
         DISTANCES[activeDistance].km,
       );
-      setAtms(res.atms ?? []);
+      const local = getLocalAtms();
+      const realIds = new Set((res.atms ?? []).map((a) => a.id));
+      const extras = local.filter((a) => !realIds.has(a.id));
+      setAtms([...extras, ...(res.atms ?? [])]);
     } catch (err: any) {
       setFetchError(err?.message ?? 'Erro ao carregar ATMs');
     } finally {
@@ -163,6 +168,11 @@ export default function MapScreen() {
   }, [location.latitude, location.longitude, location.loading, activeDistance]);
 
   useEffect(() => { fetchNearby(); }, [fetchNearby]);
+
+  // Refresh map pins when returning from add-atm or ATM detail (after delete)
+  useFocusEffect(useCallback(() => {
+    fetchNearby();
+  }, [fetchNearby]));
 
   // ---------------------------------------------------------------------------
   // Unified search: geocoding + ATM API in parallel, debounced 400ms
@@ -288,9 +298,7 @@ export default function MapScreen() {
                 coordinate={[atm.location.longitude, atm.location.latitude]}
                 onSelected={() => router.push(`/atm/${atm.id}`)}
               >
-                <View style={[styles.pin, { backgroundColor: color }]}>
-                  <Text style={styles.pinText}>K</Text>
-                </View>
+                <KudiPin color={color} size={36} />
                 <MapboxGL.Callout title={`${atm.bankName} — ${atm.name}`} />
               </MapboxGL.PointAnnotation>
             );
@@ -698,26 +706,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // ATM pin
-  pin: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2.5,
-    borderColor: Colors.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-  pinText: {
-    color: Colors.white,
-    fontWeight: '800',
-    fontSize: 15,
-  },
 
   // Admin FAB
   fab: {

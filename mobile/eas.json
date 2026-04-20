@@ -20,7 +20,10 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://kudiloc-api.onrender.com/api"
+        "EXPO_PUBLIC_API_BASE_URL": "https://kudiloc-api.onrender.com/api",
+        "EXPO_PUBLIC_API_KEY": "KudiLoc-147cc20ba5ec1b347540aed14b9e6834",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1Ijoia2l1bWF2ZWxvc28iLCJhIjoiY21uZGRmdGlhMTZvcDJwc2gwMjhkeHl4diJ9.-fwQAlVrEaD1ZGqknsunPg",
+        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1Ijoia2l1bWF2ZWxvc28iLCJhIjoiY21ueHFibm92MDRncDJxc2FhMDhsYmZ5bCJ9.JNk_btpafX9z32eYJD6qtA"
       }
     },
     "production": {
@@ -29,7 +32,10 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://kudiloc-api.onrender.com/api"
+        "EXPO_PUBLIC_API_BASE_URL": "https://kudiloc-api.onrender.com/api",
+        "EXPO_PUBLIC_API_KEY": "KudiLoc-147cc20ba5ec1b347540aed14b9e6834",
+        "EXPO_PUBLIC_MAPBOX_TOKEN": "pk.eyJ1Ijoia2l1bWF2ZWxvc28iLCJhIjoiY21uZGRmdGlhMTZvcDJwc2gwMjhkeHl4diJ9.-fwQAlVrEaD1ZGqknsunPg",
+        "RNMAPBOX_MAPS_DOWNLOAD_TOKEN": "sk.eyJ1Ijoia2l1bWF2ZWxvc28iLCJhIjoiY21ueHFibm92MDRncDJxc2FhMDhsYmZ5bCJ9.JNk_btpafX9z32eYJD6qtA"
       }
     }
   },

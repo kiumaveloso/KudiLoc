@@ -24,6 +24,7 @@ public class StatusReportServiceTests
         _mockAtmRepo = new Mock<IATMRepository>();
         _mockUserRepo = new Mock<IUserRepository>();
         _mockBadgeService = new Mock<IBadgeService>();
+        var mockCache = new Mock<ICacheService>();
         var settings = Options.Create(new ReportSettings());
 
         _service = new StatusReportService(
@@ -31,6 +32,7 @@ public class StatusReportServiceTests
             _mockAtmRepo.Object,
             _mockUserRepo.Object,
             _mockBadgeService.Object,
+            mockCache.Object,
             settings
         );
     }

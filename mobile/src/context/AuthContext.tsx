@@ -38,7 +38,7 @@ const DEMO_USER: UserDto = {
   reputationScore: 0,
   totalReports: 0,
   accurateReports: 0,
-  role: 'User',
+  role: 'Admin',
   createdAt: new Date().toISOString(),
 };
 
