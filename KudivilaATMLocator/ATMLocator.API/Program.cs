@@ -194,6 +194,10 @@ else
 }
 builder.Services.AddScoped<ICacheService, CacheService>();
 
+// Configure demo phone numbers (fixed OTP 123456 for testing)
+builder.Services.Configure<DemoSettings>(
+    builder.Configuration.GetSection("Demo"));
+
 // Configure ATM and Report settings
 builder.Services.Configure<ATMSettings>(
     builder.Configuration.GetSection("ATMSettings"));

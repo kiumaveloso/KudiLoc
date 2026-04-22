@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using ATMLocator.Core.Interfaces;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace ATMLocator.Application.Services;
 
@@ -10,17 +10,21 @@ public interface IOtpService
     Task<bool> VerifyOtpAsync(string phoneNumber, string otpCode);
 }
 
+public class DemoSettings
+{
+    public string[] PhoneNumbers { get; set; } = [];
+}
+
 public class OtpService : IOtpService
 {
     private readonly IOtpRepository _otpRepository;
     private readonly HashSet<string> _demoPhoneNumbers;
     private const string DemoOtpCode = "123456";
 
-    public OtpService(IOtpRepository otpRepository, IConfiguration config)
+    public OtpService(IOtpRepository otpRepository, IOptions<DemoSettings> demoOptions)
     {
         _otpRepository = otpRepository;
-        var numbers = config.GetSection("Demo:PhoneNumbers").Get<string[]>() ?? [];
-        _demoPhoneNumbers = new HashSet<string>(numbers, StringComparer.OrdinalIgnoreCase);
+        _demoPhoneNumbers = new HashSet<string>(demoOptions.Value.PhoneNumbers, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task<string> GenerateOtpAsync(string phoneNumber)
