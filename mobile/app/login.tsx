@@ -97,12 +97,6 @@ export default function LoginScreen() {
   };
 
   const submitOtp = async (code: string) => {
-    // Demo shortcut — any phone + 123456 logs in as demo
-    if (code === '123456') {
-      loginAsDemo(name);
-      router.replace('/(tabs)');
-      return;
-    }
     setLoading(true);
     setError('');
     try {
