@@ -1,16 +1,19 @@
 using System.Text.Json;
 using ATMLocator.Core.Interfaces;
 using Microsoft.Extensions.Caching.Distributed;
+using StackExchange.Redis;
 
 namespace ATMLocator.Infrastructure.Services;
 
 public class CacheService : ICacheService
 {
     private readonly IDistributedCache _cache;
+    private readonly IConnectionMultiplexer? _redis;
 
-    public CacheService(IDistributedCache cache)
+    public CacheService(IDistributedCache cache, IConnectionMultiplexer? redis = null)
     {
         _cache = cache;
+        _redis = redis;
     }
 
     public async Task<T?> GetAsync<T>(string key)
@@ -36,9 +39,17 @@ public class CacheService : ICacheService
 
     public async Task RemoveByPrefixAsync(string prefix)
     {
-        // StackExchange.Redis does not support pattern delete via IDistributedCache.
-        // For the ATM use case, we know the specific keys to invalidate.
-        // This method is intentionally a no-op here; callers should use RemoveAsync with specific keys.
-        await Task.CompletedTask;
+        if (_redis == null) return;
+
+        var db = _redis.GetDatabase();
+        var server = _redis.GetServers().FirstOrDefault();
+        if (server == null) return;
+
+        // SCAN is non-blocking — safe for production unlike KEYS
+        var pattern = $"{prefix}*";
+        await foreach (var key in server.KeysAsync(pattern: pattern, pageSize: 100))
+        {
+            await db.KeyDeleteAsync(key);
+        }
     }
 }

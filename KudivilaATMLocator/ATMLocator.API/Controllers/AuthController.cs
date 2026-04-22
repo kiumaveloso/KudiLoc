@@ -162,7 +162,7 @@ public class AuthController : ControllerBase
                 result = await _authService.RegisterAsync(dto.PhoneNumber, dto.Name);
             }
 
-            // Generate refresh token and set as httpOnly cookie
+            // Generate refresh token — set as httpOnly cookie (web) AND include in body (native)
             var refreshToken = await _authService.GenerateRefreshTokenAsync(result.UserId);
             Response.Cookies.Append("kudiloc_refresh", refreshToken, new CookieOptions
             {
@@ -183,7 +183,7 @@ public class AuthController : ControllerBase
                 Success = true,
             });
 
-            return Ok(result);
+            return Ok(result with { RefreshToken = refreshToken });
         }
         catch (Exception ex)
         {
@@ -193,13 +193,18 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Refresh the JWT access token using the httpOnly refresh cookie
+    /// Refresh the JWT access token.
+    /// Accepts the refresh token from the httpOnly cookie (web) or request body (native apps).
     /// </summary>
     [AllowAnonymous]
     [HttpPost("refresh")]
-    public async Task<IActionResult> RefreshToken()
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDto? dto = null)
     {
+        // Prefer cookie (web); fall back to body (native apps that can't use httpOnly cookies)
         var refreshToken = Request.Cookies["kudiloc_refresh"];
+        if (string.IsNullOrEmpty(refreshToken))
+            refreshToken = dto?.RefreshToken;
+
         if (string.IsNullOrEmpty(refreshToken))
         {
             return Unauthorized(new { statusCode = 401, message = "Token de atualização não encontrado" });
@@ -208,6 +213,18 @@ public class AuthController : ControllerBase
         try
         {
             var result = await _authService.RefreshAccessTokenAsync(refreshToken);
+
+            // Re-issue cookie for web clients and include token in body for native
+            var newRefreshToken = await _authService.GenerateRefreshTokenAsync(result.UserId);
+            await _authService.RevokeRefreshTokenAsync(refreshToken);
+            Response.Cookies.Append("kudiloc_refresh", newRefreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = DateTimeOffset.UtcNow.AddDays(30),
+                Path = "/"
+            });
 
             await _auditRepo.CreateAsync(new LoginAudit
             {
@@ -219,7 +236,7 @@ public class AuthController : ControllerBase
                 Success = true,
             });
 
-            return Ok(result);
+            return Ok(result with { RefreshToken = newRefreshToken });
         }
         catch (UnauthorizedAccessException ex)
         {

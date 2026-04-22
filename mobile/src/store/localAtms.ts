@@ -19,6 +19,18 @@ export function removeLocalAtm(id: string): void {
   if (idx !== -1) _atms.splice(idx, 1);
 }
 
+export function updateLocalAtmStatus(id: string, cash: 'has' | 'no' | 'offline'): void {
+  const atm = _atms.find((a) => a.id === id);
+  if (!atm) return;
+  atm.status = {
+    ...atm.status,
+    hasCash: cash === 'has',
+    hasMoney: cash === 'has',
+    operationalStatus: cash === 'offline' ? 'Offline' : 'Operational',
+    lastVerified: new Date().toISOString(),
+  };
+}
+
 export function getLocalAtms(): NearbyATMResult[] {
   return [..._atms];
 }

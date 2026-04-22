@@ -30,6 +30,16 @@ export function useLocation(): LocationState {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const applyCoords = (lat: number, lon: number) => {
+    if (isInAngola(lat, lon)) {
+      setLatitude(lat);
+      setLongitude(lon);
+    } else {
+      setLatitude(DEFAULT_LATITUDE);
+      setLongitude(DEFAULT_LONGITUDE);
+    }
+  };
+
   const fetchLocation = async () => {
     setLoading(true);
     setError(null);
@@ -38,14 +48,10 @@ export function useLocation(): LocationState {
     if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          setLatitude(isInAngola(lat, lon) ? lat : DEFAULT_LATITUDE);
-          setLongitude(isInAngola(lat, lon) ? lon : DEFAULT_LONGITUDE);
+          applyCoords(pos.coords.latitude, pos.coords.longitude);
           setLoading(false);
         },
         () => {
-          // Permission denied or unavailable — stay on Luanda default
           setError(pt.locationDenied);
           setLoading(false);
         },
@@ -59,31 +65,35 @@ export function useLocation(): LocationState {
       if (status !== 'granted') {
         setError(pt.locationDenied);
         if (Platform.OS !== 'web') {
-          Alert.alert(
-            pt.locationPermissionTitle,
-            pt.locationPermissionMessage,
-          );
+          Alert.alert(pt.locationPermissionTitle, pt.locationPermissionMessage);
         }
         setLoading(false);
         return;
       }
 
+      // Get initial position with high accuracy
       const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.High,
       });
-      const lat = loc.coords.latitude;
-      const lon = loc.coords.longitude;
-      setLatitude(isInAngola(lat, lon) ? lat : DEFAULT_LATITUDE);
-      setLongitude(isInAngola(lat, lon) ? lon : DEFAULT_LONGITUDE);
+      applyCoords(loc.coords.latitude, loc.coords.longitude);
+      setLoading(false);
+
+      // Watch for continuous position updates
+      const sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, distanceInterval: 10 },
+        (pos) => applyCoords(pos.coords.latitude, pos.coords.longitude),
+      );
+      return sub;
     } catch {
       setError(pt.locationUnavailable);
-    } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLocation();
+    let sub: Location.LocationSubscription | undefined;
+    fetchLocation().then((s) => { sub = s as any; });
+    return () => { sub?.remove(); };
   }, []);
 
   return { latitude, longitude, loading, error, refresh: fetchLocation };

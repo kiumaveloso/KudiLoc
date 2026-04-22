@@ -47,6 +47,7 @@ public class StatusReportRepository : IStatusReportRepository
         return await _context.StatusReports
             .Find(filter)
             .SortByDescending(report => report.ReportedAt)
+            .Limit(500)
             .ToListAsync();
     }
 

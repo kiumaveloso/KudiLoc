@@ -13,6 +13,7 @@ export const Colors = {
   cashGreen: '#10B981',         // has cash
   noCashGold: '#EF4444',        // no cash (red)
   offlineGrey: '#9CA3AF',       // offline / unknown
+  favourite: '#F59E0B',         // favourite star — amber yellow
 
   // Neutrals
   white: '#FFFFFF',

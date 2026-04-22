@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Radius, Spacing, atmMarkerColor } from '../../src/constants/theme';
-import { KudiPin } from '../../src/components/KudiLocLogo';
+import { KudiPin, ATMMapPin } from '../../src/components/KudiLocLogo';
 import { getNearbyATMs, searchATMs } from '../../src/api/atm';
 import { getLocalAtms } from '../../src/store/localAtms';
 import { useLocation } from '../../src/hooks/useLocation';
@@ -130,6 +130,7 @@ export default function MapScreen() {
 
   const cameraRef = useRef<any>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipChipAnimation = useRef(false);
 
   const [atms, setAtms] = useState<NearbyATMResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -168,6 +169,27 @@ export default function MapScreen() {
   }, [location.latitude, location.longitude, location.loading, activeDistance]);
 
   useEffect(() => { fetchNearby(); }, [fetchNearby]);
+
+  const moveCameraTo = useCallback((
+    center: [number, number],
+    zoom: number,
+    mode: 'flyTo' | 'easeTo' | 'none' = 'flyTo',
+    duration = 900,
+  ) => {
+    if (!cameraRef.current) return;
+    if (mode === 'none') {
+      cameraRef.current.setCamera({
+        centerCoordinate: center,
+        zoomLevel: zoom,
+        animationMode: 'none',
+        animationDuration: 0,
+      });
+    } else {
+      // flyTo handles center movement; zoomTo handles zoom change — both animated
+      cameraRef.current.flyTo(center, duration);
+      cameraRef.current.zoomTo(zoom, duration);
+    }
+  }, []);
 
   // Refresh map pins when returning from add-atm or ATM detail (after delete)
   useFocusEffect(useCallback(() => {
@@ -219,24 +241,14 @@ export default function MapScreen() {
     Keyboard.dismiss();
     setSearchText('');
     setResults([]);
-    cameraRef.current?.setCamera({
-      centerCoordinate: [place.longitude, place.latitude],
-      zoomLevel: place.zoom,
-      animationMode: 'flyTo',
-      animationDuration: 700,
-    });
+    moveCameraTo([place.longitude, place.latitude], place.zoom);
   };
 
   const handleSelectATM = (atm: ATMDto) => {
     Keyboard.dismiss();
     setSearchText('');
     setResults([]);
-    cameraRef.current?.setCamera({
-      centerCoordinate: [atm.location.longitude, atm.location.latitude],
-      zoomLevel: 16,
-      animationMode: 'flyTo',
-      animationDuration: 700,
-    });
+    moveCameraTo([atm.location.longitude, atm.location.latitude], 16);
   };
 
   const handleViewATMDetail = (atm: ATMDto) => {
@@ -251,13 +263,18 @@ export default function MapScreen() {
   // ---------------------------------------------------------------------------
   const handleDistanceChange = useCallback((index: number) => {
     setActiveDistance(index);
-    cameraRef.current?.setCamera({
-      centerCoordinate: [location.longitude, location.latitude],
-      zoomLevel: DISTANCES[index].zoom,
-      animationMode: 'flyTo',
-      animationDuration: 600,
-    });
-  }, [location.latitude, location.longitude]);
+  }, []);
+
+  // Animate camera after distance chip changes state (skip when recenter triggers it)
+  useEffect(() => {
+    if (skipChipAnimation.current) {
+      skipChipAnimation.current = false;
+      return;
+    }
+    if (!location.loading) {
+      moveCameraTo([location.longitude, location.latitude], DISTANCES[activeDistance].zoom, 'flyTo', 900);
+    }
+  }, [activeDistance]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (location.loading) return <LoadingScreen message="A obter localização..." />;
 
@@ -282,25 +299,49 @@ export default function MapScreen() {
         >
           <MapboxGL.Camera
             ref={cameraRef}
-            zoomLevel={DISTANCES[activeDistance].zoom}
-            centerCoordinate={[location.longitude, location.latitude]}
-            animationMode="flyTo"
-            animationDuration={800}
+            defaultSettings={{
+              centerCoordinate: [location.longitude, location.latitude],
+              zoomLevel: DISTANCES[activeDistance].zoom,
+            }}
           />
-          <MapboxGL.UserLocation visible animated />
+          {/* Custom user location dot driven by expo-location (already filtered
+              to Angola — avoids simulator showing Apple Park / Cupertino) */}
+          {(() => {
+            const UserMarker = (MapboxGL as any).MarkerView ?? MapboxGL.PointAnnotation;
+            return (
+              <UserMarker
+                id="user-location"
+                coordinate={[location.longitude, location.latitude]}
+              >
+                <View style={styles.userDot}>
+                  <View style={styles.userDotInner} />
+                </View>
+              </UserMarker>
+            );
+          })()}
 
           {atms.map((atm) => {
             const color = atmMarkerColor(atm.status.operationalStatus, atm.status.hasCash);
+            // Use MarkerView for reliable custom-view rendering; fall back to
+            // PointAnnotation if MarkerView is not available in this build.
+            const Marker = (MapboxGL as any).MarkerView ?? MapboxGL.PointAnnotation;
+            const markerProps = (MapboxGL as any).MarkerView
+              ? { anchor: { x: 0.5, y: 1 } }
+              : { onSelected: () => router.push(`/atm/${atm.id}`) };
             return (
-              <MapboxGL.PointAnnotation
-                key={atm.id}
+              <Marker
+                key={`${atm.id}-${color}`}
                 id={atm.id}
                 coordinate={[atm.location.longitude, atm.location.latitude]}
-                onSelected={() => router.push(`/atm/${atm.id}`)}
+                {...markerProps}
               >
-                <KudiPin color={color} size={36} />
-                <MapboxGL.Callout title={`${atm.bankName} — ${atm.name}`} />
-              </MapboxGL.PointAnnotation>
+                <TouchableOpacity
+                  onPress={() => router.push(`/atm/${atm.id}`)}
+                  activeOpacity={0.8}
+                >
+                  <ATMMapPin color={color} />
+                </TouchableOpacity>
+              </Marker>
             );
           })}
         </MapboxGL.MapView>
@@ -347,11 +388,6 @@ export default function MapScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity style={styles.circleBtn} onPress={fetchNearby}>
-          {loading
-            ? <ActivityIndicator size="small" color={Colors.primary} />
-            : <Ionicons name="refresh" size={18} color={Colors.primary} />}
-        </TouchableOpacity>
       </View>
 
       {/* ------------------------------------------------------------------ */}
@@ -500,6 +536,26 @@ export default function MapScreen() {
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={26} color={Colors.white} />
+        </TouchableOpacity>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Recenter button — above FAB when admin, otherwise at same level     */}
+      {/* ------------------------------------------------------------------ */}
+      {!showDropdown && MapboxGL && (
+        <TouchableOpacity
+          style={[
+            styles.recenterBtn,
+            { bottom: insets.bottom + (isAdmin ? 164 : 100) },
+          ]}
+          onPress={() => {
+            skipChipAnimation.current = true;
+            setActiveDistance(1); // reset to 1km
+            moveCameraTo([location.longitude, location.latitude], DISTANCES[1].zoom, 'flyTo', 900);
+          }}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="locate" size={20} color={Colors.primary} />
         </TouchableOpacity>
       )}
 
@@ -722,6 +778,47 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 10,
+  },
+
+  // Custom user location dot
+  userDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'transparent',
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  userDotInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#0055FF',
+  },
+
+  // Recenter button
+  recenterBtn: {
+    position: 'absolute',
+    left: Spacing.lg,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
     zIndex: 10,
   },
 

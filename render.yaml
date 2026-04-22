@@ -5,8 +5,10 @@ services:
     dockerfilePath: ./KudivilaATMLocator/Dockerfile
     dockerContext: ./KudivilaATMLocator
     region: frankfurt  # Closest Render region to Angola
-    plan: free
+    plan: starter
     healthCheckPath: /health
+    numInstances: 1
+    autoDeploy: true
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production

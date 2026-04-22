@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useRouter, useSegments } from 'expo-router';
 import { AuthProvider } from '../src/context/AuthContext';
+import { FavouritesProvider } from '../src/context/FavouritesContext';
 import { Colors } from '../src/constants/theme';
 import { isOnboardingDone } from './onboarding';
 
@@ -37,15 +38,17 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
-          <StatusBar style="dark" />
-          <OnboardingGate>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: Colors.background },
-              }}
-            />
-          </OnboardingGate>
+          <FavouritesProvider>
+            <StatusBar style="dark" />
+            <OnboardingGate>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: Colors.background },
+                }}
+              />
+            </OnboardingGate>
+          </FavouritesProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

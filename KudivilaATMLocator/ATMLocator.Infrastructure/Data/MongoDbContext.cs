@@ -47,6 +47,10 @@ public class MongoDbContext
         var clientSettings = MongoClientSettings.FromUrl(mongoUrl);
         clientSettings.ServerSelectionTimeout = TimeSpan.FromSeconds(5);
         clientSettings.ConnectTimeout = TimeSpan.FromSeconds(5);
+        clientSettings.SocketTimeout = TimeSpan.FromSeconds(10);
+        clientSettings.MaxConnectionPoolSize = 300;
+        clientSettings.MinConnectionPoolSize = 10;
+        clientSettings.WaitQueueTimeout = TimeSpan.FromSeconds(5);
 
         var client = new MongoClient(clientSettings);
         _database = client.GetDatabase(_settings.DatabaseName);

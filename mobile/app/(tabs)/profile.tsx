@@ -211,11 +211,11 @@ export default function ProfileScreen() {
         {/* ---------------------------------------------------------------- */}
         <Text style={styles.sectionLabel}>INFORMAÇÃO</Text>
         <View style={styles.infoCard}>
-          <InfoRow icon="help-circle-outline" label="Ajuda e Suporte" />
+          <InfoRow icon="help-circle-outline" label="Ajuda e Suporte" onPress={() => router.push('/legal/support')} />
           <View style={styles.infoSep} />
-          <InfoRow icon="document-text-outline" label="Política de Privacidade" />
+          <InfoRow icon="document-text-outline" label="Política de Privacidade" onPress={() => router.push('/legal/privacy')} />
           <View style={styles.infoSep} />
-          <InfoRow icon="document-outline" label="Termos de Serviço" />
+          <InfoRow icon="document-outline" label="Termos de Serviço" onPress={() => router.push('/legal/terms')} />
         </View>
 
         {/* Logout */}
@@ -238,9 +238,9 @@ function StatItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InfoRow({ icon, label }: { icon: string; label: string }) {
+function InfoRow({ icon, label, onPress }: { icon: string; label: string; onPress?: () => void }) {
   return (
-    <TouchableOpacity style={styles.infoRow}>
+    <TouchableOpacity style={styles.infoRow} onPress={onPress}>
       <Ionicons name={icon as any} size={18} color={Colors.primary} />
       <Text style={styles.infoLabel}>{label}</Text>
       <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />

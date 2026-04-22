@@ -1,5 +1,6 @@
 using System.Text;
 using AspNetCoreRateLimit;
+using StackExchange.Redis;
 using ATMLocator.Application.Services;
 using ATMLocator.Infrastructure.Services;
 using Serilog;
@@ -182,6 +183,9 @@ if (!string.IsNullOrEmpty(redisConnection))
     {
         options.Configuration = redisConnection;
     });
+    // Register IConnectionMultiplexer for prefix-based cache invalidation
+    builder.Services.AddSingleton<IConnectionMultiplexer>(
+        ConnectionMultiplexer.Connect(redisConnection));
 }
 else
 {

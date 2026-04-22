@@ -22,7 +22,7 @@ import { getLocalAtms, removeLocalAtm } from '../../src/store/localAtms';
 import { useLocation } from '../../src/hooks/useLocation';
 import { KudiPin } from '../../src/components/KudiLocLogo';
 import { StatusLight } from '../../src/components/StatusLight';
-import { useFavourites } from '../../src/hooks/useFavourites';
+import { useFavourites } from '../../src/context/FavouritesContext';
 import { useAuth } from '../../src/context/AuthContext';
 import type { NearbyATMResult } from '../../src/types';
 
@@ -85,6 +85,7 @@ export default function ListaScreen() {
     const color = atmMarkerColor(item.status.operationalStatus, item.status.hasCash);
     const hasCash = item.status.hasCash;
     const isOffline = item.status.operationalStatus?.toLowerCase() === 'offline';
+    const fav = isFav(item.id);
     const distText = item.distanceKm != null
       ? item.distanceKm < 1 ? `${Math.round(item.distanceKm * 1000)}m` : `${item.distanceKm.toFixed(1)}km`
       : '—';
@@ -122,10 +123,13 @@ export default function ListaScreen() {
           </View>
         </View>
 
-        {/* Distance + chevron */}
+        {/* Distance + favourite + chevron */}
         <View style={styles.cardRight}>
           <Text style={styles.distance}>{distText}</Text>
-          <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
+          <View style={styles.cardRightBottom}>
+            {fav && <Ionicons name="star" size={13} color={Colors.favourite} />}
+            <Ionicons name="chevron-forward" size={14} color={Colors.textMuted} />
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -157,7 +161,7 @@ export default function ListaScreen() {
               <Ionicons
                 name={f.icon as any}
                 size={11}
-                color={filter === f.key ? Colors.white : Colors.noCashGold}
+                color={filter === f.key ? Colors.white : Colors.favourite}
               />
             )}
             <Text style={[styles.filterText, filter === f.key && styles.filterTextActive]}>
@@ -393,6 +397,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     marginLeft: Spacing.sm,
+  },
+  cardRightBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   distance: {
     fontSize: FontSize.sm,

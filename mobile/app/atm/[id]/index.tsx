@@ -33,9 +33,9 @@ import {
   submitStatusReport,
   deleteATM,
 } from '../../../src/api/atm';
-import { removeLocalAtm, getLocalAtms } from '../../../src/store/localAtms';
+import { removeLocalAtm, getLocalAtms, updateLocalAtmStatus } from '../../../src/store/localAtms';
 import { useAuth } from '../../../src/context/AuthContext';
-import { useFavourites } from '../../../src/hooks/useFavourites';
+import { useFavourites } from '../../../src/context/FavouritesContext';
 import LoadingScreen from '../../../src/components/LoadingScreen';
 import type { ATMDto, CommentDto, CreateStatusReport } from '../../../src/types';
 
@@ -185,8 +185,9 @@ export default function ATMDetailScreen() {
     setReportSubmitting(true);
     try {
       if (!user || IS_DEMO(user.id)) {
-        // Demo mode — update local state immediately
+        // Demo mode — update local state and the store (so map/list also reflect it)
         applyReportToLocalState(cash);
+        if (id) updateLocalAtmStatus(id, cash);
         setReportSuccess(true);
         setTimeout(() => { setReportVisible(false); }, 2000);
         return;
@@ -399,8 +400,8 @@ export default function ATMDetailScreen() {
             </TouchableOpacity>
             <View style={styles.actionDivider} />
             <TouchableOpacity style={styles.actionBtn} onPress={() => id && toggleFav(id)}>
-              <Ionicons name={id && isFav(id) ? 'star' : 'star-outline'} size={18} color={id && isFav(id) ? Colors.noCashGold : Colors.text} />
-              <Text style={[styles.actionBtnText, id && isFav(id) && { color: Colors.noCashGold }]}>Favorito</Text>
+              <Ionicons name={id && isFav(id) ? 'star' : 'star-outline'} size={18} color={id && isFav(id) ? Colors.favourite : Colors.text} />
+              <Text style={[styles.actionBtnText, id && isFav(id) && { color: Colors.favourite }]}>Favorito</Text>
             </TouchableOpacity>
             <View style={styles.actionDivider} />
             <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>

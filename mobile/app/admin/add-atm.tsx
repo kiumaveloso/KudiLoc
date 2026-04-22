@@ -25,8 +25,27 @@ import { useLocation } from '../../src/hooks/useLocation';
 import { useAuth } from '../../src/context/AuthContext';
 
 const BANKS = [
-  'BFA', 'BAI', 'BIC', 'Millennium Atlântico', 'BPC', 'SOL',
-  'Banco Caixa Geral Angola', 'BCI', 'Banco Kwanza Invest', 'Outro',
+  'BAI',
+  'BFA',
+  'BIC',
+  'BPC',
+  'Banco Millennium Atlântico',
+  'Banco Económico',
+  'BNI',
+  'Banco de Comércio e Indústria',
+  'BCA',
+  'Banco SOL',
+  'Standard Bank Angola',
+  'Standard Chartered Angola',
+  'Banco Keve',
+  'Banco Valor',
+  'Banco de Desenvolvimento de Angola (BDA)',
+  'Banco de Investimento Rural (BIR)',
+  'Banco Comercial do Huambo',
+  'Banco Yetu',
+  'Banco de Crédito do Sul (BCS)',
+  'Novo Banco Angola',
+  'Banco Prestígio',
 ];
 
 export default function AddATMScreen() {
@@ -72,61 +91,58 @@ export default function AddATMScreen() {
     !isNaN(Number(lat)) &&
     !isNaN(Number(lng));
 
-  const isDemo = user?.id === 'demo-user-001';
-
   const handleSubmit = async () => {
     if (!isValid) return;
     setLoading(true);
     try {
-      if (isDemo) {
-        await new Promise((r) => setTimeout(r, 600));
-        // Add to local store so it appears immediately in map/list
-        addLocalAtm({
-          id: `demo-${Date.now()}`,
-          name: name.trim(),
-          bankName: bankName.trim(),
-          location: {
-            latitude: Number(lat),
-            longitude: Number(lng),
-            province: province.trim() || 'Luanda',
-            municipality: municipality.trim() || '',
-          },
-          status: {
-            hasCash: true,
-            hasMoney: true,
-            hasPaper: true,
-            operationalStatus: 'Operational',
-            reliabilityScore: 0,
-            lastVerified: new Date().toISOString(),
-            statusDescription: 'Recém adicionado',
-            totalReports: 0,
-          },
-          address: {
-            street: street.trim() || '',
-            neighborhood: neighborhood.trim() || '',
-            landmark: landmark.trim() || undefined,
-          },
-          distanceKm: 0,
-          estimatedWalkingTime: 0,
-        });
-      } else {
-        await createATM({
-          name: name.trim(),
-          bankName: bankName.trim(),
+      const created = await createATM({
+        name: name.trim(),
+        bankName: bankName.trim(),
+        latitude: Number(lat),
+        longitude: Number(lng),
+        province: province.trim() || undefined,
+        municipality: municipality.trim() || undefined,
+        neighborhood: neighborhood.trim() || undefined,
+        street: street.trim() || undefined,
+        landmark: landmark.trim() || undefined,
+      });
+
+      // Add to local store for immediate visibility on map/list before next fetch
+      addLocalAtm({
+        id: created.id,
+        name: created.name,
+        bankName: created.bankName,
+        location: {
           latitude: Number(lat),
           longitude: Number(lng),
-          province: province.trim() || undefined,
-          municipality: municipality.trim() || undefined,
-          neighborhood: neighborhood.trim() || undefined,
-          street: street.trim() || undefined,
+          province: province.trim() || 'Luanda',
+          municipality: municipality.trim() || '',
+        },
+        status: {
+          hasCash: created.status?.hasCash ?? false,
+          hasMoney: created.status?.hasCash ?? false,
+          hasPaper: true,
+          operationalStatus: created.status?.operationalStatus ?? 'Operational',
+          reliabilityScore: created.status?.reliabilityScore ?? 0,
+          lastVerified: created.status?.lastVerified ?? new Date().toISOString(),
+          statusDescription: 'Recém adicionado',
+          totalReports: 0,
+        },
+        address: {
+          street: street.trim() || '',
+          neighborhood: neighborhood.trim() || '',
           landmark: landmark.trim() || undefined,
-        });
-      }
-      Alert.alert('ATM adicionado', `"${name}" foi adicionado com sucesso.`, [
+        },
+        distanceKm: 0,
+        estimatedWalkingTime: 0,
+      });
+
+      Alert.alert('ATM adicionado', `"${name.trim()}" foi adicionado e guardado com sucesso.`, [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível adicionar o ATM.');
+      const msg = e?.message ?? 'Não foi possível adicionar o ATM.';
+      Alert.alert('Erro ao adicionar ATM', msg);
     } finally {
       setLoading(false);
     }

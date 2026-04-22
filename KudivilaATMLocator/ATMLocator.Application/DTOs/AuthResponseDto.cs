@@ -5,5 +5,6 @@ public record AuthResponseDto(
     string UserId,
     string PhoneNumber,
     string? Name,
-    int ReputationScore
+    int ReputationScore,
+    string? RefreshToken = null
 );
