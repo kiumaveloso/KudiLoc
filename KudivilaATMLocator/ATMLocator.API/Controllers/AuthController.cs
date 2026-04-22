@@ -320,11 +320,17 @@ public class AuthController : ControllerBase
 
         var user = await _userService.GetUserByPhoneNumberAsync(dto.PhoneNumber);
         if (user == null)
-            return NotFound(new { message = "Utilizador não encontrado." });
+        {
+            // Auto-register if not found so bootstrap works before first login
+            var registered = await _authService.RegisterAsync(dto.PhoneNumber, dto.Name ?? "Admin");
+            user = await _userService.GetUserByPhoneNumberAsync(dto.PhoneNumber)
+                   ?? throw new InvalidOperationException("Failed to create user during bootstrap.");
+            _logger.LogInformation("Bootstrap: registered new user {Id} for {Phone}", user.Id, dto.PhoneNumber);
+        }
 
         await _userService.AssignRoleAsync(user.Id, "Admin");
         _logger.LogInformation("Bootstrap: user {Id} promoted to Admin", user.Id);
-        return Ok(new { message = $"Utilizador {user.Name ?? user.Id} é agora Admin." });
+        return Ok(new { message = $"Utilizador {user.Name ?? user.Id} é agora Admin.", user_id = user.Id });
     }
 
     // -----------------------------------------------------------------------
