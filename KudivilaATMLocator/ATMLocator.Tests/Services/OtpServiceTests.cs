@@ -1,6 +1,7 @@
 using ATMLocator.Application.Services;
 using ATMLocator.Core.Entities;
 using ATMLocator.Core.Interfaces;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 
@@ -13,7 +14,7 @@ public class OtpServiceTests
 
     public OtpServiceTests()
     {
-        _sut = new OtpService(_repoMock.Object);
+        _sut = new OtpService(_repoMock.Object, Options.Create(new DemoSettings()));
     }
 
     [Fact]
@@ -21,7 +22,7 @@ public class OtpServiceTests
     {
         _repoMock.Setup(r => r.SaveAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>()))
             .Returns(Task.CompletedTask);
-        var code = await _sut.GenerateOtpAsync("+244912345678");
+        var code = await _sut.GenerateOtpAsync("+244911111111");
         Assert.Matches(@"^\d{6}$", code);
     }
 
