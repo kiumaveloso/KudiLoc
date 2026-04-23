@@ -32,6 +32,7 @@ import {
   addComment,
   submitStatusReport,
   deleteATM,
+  setATMStatus,
 } from '../../../src/api/atm';
 import { removeLocalAtm, getLocalAtms, updateLocalAtmStatus } from '../../../src/store/localAtms';
 import { useAuth } from '../../../src/context/AuthContext';
@@ -192,24 +193,51 @@ export default function ATMDetailScreen() {
         setTimeout(() => { setReportVisible(false); }, 2000);
         return;
       }
-      const report: CreateStatusReport = {
-        atmId: id,
-        userId: user?.id,
-        hasCash: cash === 'has',
-        hasPaper: reportPaper ?? undefined,
-        operationalStatus: cash === 'offline' ? 'Offline' : 'Operational',
-      };
-      await submitStatusReport(report);
-      // Apply optimistic update immediately, then confirm from server
+      if (isAdmin) {
+        // Admins use direct status override — no cooldown
+        await setATMStatus(
+          id,
+          cash === 'has',
+          cash === 'offline' ? 'Offline' : 'Operational',
+        );
+      } else {
+        const report: CreateStatusReport = {
+          atmId: id,
+          userId: user?.id,
+          hasCash: cash === 'has',
+          hasPaper: reportPaper ?? undefined,
+          operationalStatus: cash === 'offline' ? 'Offline' : 'Operational',
+        };
+        await submitStatusReport(report);
+      }
       applyReportToLocalState(cash);
+      if (id) updateLocalAtmStatus(id, cash);
       setReportSuccess(true);
-      setTimeout(() => { setReportVisible(false); fetchAll(); }, 2000);
+      setTimeout(() => { setReportVisible(false); }, 2000);
     } catch { /* silent */ } finally {
       setReportSubmitting(false);
     }
   };
 
   const isAdmin = user?.role === 'Admin';
+
+  const [adminStatusLoading, setAdminStatusLoading] = useState(false);
+
+  const handleAdminSetStatus = async (cash: 'has' | 'no' | 'offline') => {
+    if (!id || !isAdmin) return;
+    setAdminStatusLoading(true);
+    try {
+      const hasCash = cash === 'has';
+      const opStatus = cash === 'offline' ? 'Offline' : 'Operational';
+      await setATMStatus(id, hasCash, opStatus as 'Operational' | 'Offline' | 'Maintenance');
+      applyReportToLocalState(cash);
+      if (id) updateLocalAtmStatus(id, cash);
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Não foi possível atualizar o estado.');
+    } finally {
+      setAdminStatusLoading(false);
+    }
+  };
 
   const handleDelete = () => {
     Alert.alert(
@@ -411,16 +439,6 @@ export default function ATMDetailScreen() {
           </View>
 
           {/* ---------------------------------------------------------------- */}
-          {/* Sobre estes dados */}
-          {/* ---------------------------------------------------------------- */}
-          <View style={styles.aboutCard}>
-            <Text style={styles.aboutTitle}>Sobre estes dados</Text>
-            <Text style={styles.aboutBody}>
-              A disponibilidade do dinheiro em tempo real é reportada pelos utilizadores e verificada pela nossa rede. O nível de confiança indica a fiabilidade da informação com base no número e recência dos reports.
-            </Text>
-          </View>
-
-          {/* ---------------------------------------------------------------- */}
           {/* COMUNIDADE */}
           {/* ---------------------------------------------------------------- */}
           <View style={styles.communitySection}>
@@ -505,14 +523,14 @@ export default function ATMDetailScreen() {
                 <View style={styles.sheetToggleRow}>
                   <TouchableOpacity
                     style={[styles.sheetToggle, reportCash === 'has' && styles.sheetToggleActiveGreen]}
-                    onPress={() => setReportCash('has')}
+                    onPress={() => { setReportCash('has'); handleSubmitReport('has'); }}
                   >
                     <Ionicons name="checkmark" size={16} color={reportCash === 'has' ? Colors.cashGreen : Colors.textMuted} />
                     <Text style={[styles.sheetToggleText, reportCash === 'has' && { color: Colors.cashGreen }]}>Tem dinheiro</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.sheetToggle, reportCash === 'no' && styles.sheetToggleActiveRed]}
-                    onPress={() => setReportCash('no')}
+                    onPress={() => { setReportCash('no'); handleSubmitReport('no'); }}
                   >
                     <Ionicons name="ban-outline" size={16} color={reportCash === 'no' ? '#D73A3A' : Colors.textMuted} />
                     <Text style={[styles.sheetToggleText, reportCash === 'no' && { color: '#D73A3A' }]}>Sem dinheiro</Text>
@@ -956,6 +974,51 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textMuted,
     fontWeight: '500',
+  },
+
+  // Admin status card
+  adminStatusCard: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.primaryLight,
+    gap: Spacing.md,
+  },
+  adminStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  adminStatusTitle: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.primaryDark,
+    letterSpacing: 0.6,
+  },
+  adminStatusRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  adminStatusBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.sm + 2,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
+  adminStatusBtnText: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+  },
+  adminStatusHint: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    textAlign: 'center',
   },
 
   // Success state

@@ -7,6 +7,19 @@ import type { NearbyATMResult } from '../types';
 
 const _atms: NearbyATMResult[] = [];
 
+// Simple pub-sub so map/list screens can react to status changes instantly
+type StatusListener = (id: string, cash: 'has' | 'no' | 'offline') => void;
+const _listeners = new Set<StatusListener>();
+
+export function subscribeToStatusChanges(fn: StatusListener): () => void {
+  _listeners.add(fn);
+  return () => _listeners.delete(fn);
+}
+
+function _notifyStatusChange(id: string, cash: 'has' | 'no' | 'offline') {
+  _listeners.forEach((fn) => fn(id, cash));
+}
+
 export function addLocalAtm(atm: NearbyATMResult): void {
   // Avoid duplicates
   if (!_atms.find((a) => a.id === atm.id)) {
@@ -21,14 +34,16 @@ export function removeLocalAtm(id: string): void {
 
 export function updateLocalAtmStatus(id: string, cash: 'has' | 'no' | 'offline'): void {
   const atm = _atms.find((a) => a.id === id);
-  if (!atm) return;
-  atm.status = {
-    ...atm.status,
-    hasCash: cash === 'has',
-    hasMoney: cash === 'has',
-    operationalStatus: cash === 'offline' ? 'Offline' : 'Operational',
-    lastVerified: new Date().toISOString(),
-  };
+  if (atm) {
+    atm.status = {
+      ...atm.status,
+      hasCash: cash === 'has',
+      hasMoney: cash === 'has',
+      operationalStatus: cash === 'offline' ? 'Offline' : 'Operational',
+      lastVerified: new Date().toISOString(),
+    };
+  }
+  _notifyStatusChange(id, cash);
 }
 
 export function getLocalAtms(): NearbyATMResult[] {

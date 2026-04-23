@@ -12,3 +12,10 @@ export async function getUserById(id: string): Promise<UserDto> {
 export async function getLeaderboard(limit = 20): Promise<LeaderboardEntry[]> {
   return apiFetch<LeaderboardEntry[]>(`/leaderboard?limit=${limit}`);
 }
+
+export async function updateUserName(id: string, name: string): Promise<UserDto> {
+  return apiFetch<UserDto>(`/user/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  });
+}

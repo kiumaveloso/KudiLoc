@@ -67,6 +67,18 @@ export async function deleteATM(id: string): Promise<void> {
   return apiFetch<void>(`/atm/${id}`, { method: 'DELETE' });
 }
 
+/** Admin-only: directly set ATM cash/operational status, bypassing cooldowns. */
+export async function setATMStatus(
+  id: string,
+  hasCash: boolean,
+  operationalStatus: 'Operational' | 'Offline' | 'Maintenance',
+): Promise<ATMDto> {
+  return apiFetch<ATMDto>(`/atm/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ has_cash: hasCash, operational_status: operationalStatus }),
+  });
+}
+
 /** Search ATMs by text query. */
 export async function searchATMs(
   query: string,

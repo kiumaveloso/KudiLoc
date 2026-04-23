@@ -356,6 +356,27 @@ public class ATMController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Admin-only: directly set an ATM's cash/operational status, bypassing crowdsource cooldowns.
+    /// </summary>
+    [Authorize(Roles = "Admin")]
+    [HttpPatch("{id}/status")]
+    public async Task<ActionResult<ATMDto>> AdminSetStatus(string id, [FromBody] AdminSetStatusDto dto)
+    {
+        try
+        {
+            var atm = await _atmService.AdminSetStatusAsync(id, dto.HasCash, dto.OperationalStatus ?? "Operational");
+            if (atm == null)
+                return NotFound(new { statusCode = 404, message = "Caixa automático não encontrado" });
+            return Ok(atm);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting admin status for ATM: {Id}", id);
+            return StatusCode(500, new { statusCode = 500, message = "Erro ao atualizar estado do ATM" });
+        }
+    }
+
     [Authorize]
     [HttpPost("{id}/photo")]
     [RequestSizeLimit(8 * 1024 * 1024)] // 8 MB for photo uploads (Base64 inflates ~33%)

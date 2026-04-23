@@ -19,7 +19,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Radius, Spacing } from '../../src/constants/theme';
-import { createATM } from '../../src/api/atm';
+import { createATM, setATMStatus } from '../../src/api/atm';
 import { addLocalAtm } from '../../src/store/localAtms';
 import { useLocation } from '../../src/hooks/useLocation';
 import { useAuth } from '../../src/context/AuthContext';
@@ -75,6 +75,7 @@ export default function AddATMScreen() {
   const [street, setStreet]         = useState('');
   const [landmark, setLandmark]     = useState('');
   const [loading, setLoading]       = useState(false);
+  const [initialStatus, setInitialStatus] = useState<'has' | 'no' | 'offline'>('no');
 
   const useCurrentLocation = () => {
     if (!location.loading) {
@@ -107,6 +108,14 @@ export default function AddATMScreen() {
         landmark: landmark.trim() || undefined,
       });
 
+      // Set initial status directly (admin endpoint, no cooldown)
+      const hasCash = initialStatus === 'has';
+      const opStatus = initialStatus === 'offline' ? 'Offline' : 'Operational';
+      try {
+        await setATMStatus(created.id, hasCash, opStatus as 'Operational' | 'Offline' | 'Maintenance');
+      } catch { /* non-fatal */ }
+      const finalStatus = { hasCash, operationalStatus: opStatus, reliabilityScore: 80, lastVerified: new Date().toISOString() };
+
       // Add to local store for immediate visibility on map/list before next fetch
       addLocalAtm({
         id: created.id,
@@ -119,14 +128,14 @@ export default function AddATMScreen() {
           municipality: municipality.trim() || '',
         },
         status: {
-          hasCash: created.status?.hasCash ?? false,
-          hasMoney: created.status?.hasCash ?? false,
+          hasCash: finalStatus.hasCash,
+          hasMoney: finalStatus.hasCash,
           hasPaper: true,
-          operationalStatus: created.status?.operationalStatus ?? 'Operational',
-          reliabilityScore: created.status?.reliabilityScore ?? 0,
-          lastVerified: created.status?.lastVerified ?? new Date().toISOString(),
+          operationalStatus: finalStatus.operationalStatus,
+          reliabilityScore: finalStatus.reliabilityScore,
+          lastVerified: finalStatus.lastVerified,
           statusDescription: 'Recém adicionado',
-          totalReports: 0,
+          totalReports: 1,
         },
         address: {
           street: street.trim() || '',
@@ -246,6 +255,34 @@ export default function AddATMScreen() {
             placeholder="Av. 4 de Fevereiro" />
           <Field label="Ponto de referência" value={landmark} onChangeText={setLandmark}
             placeholder="Em frente ao TAAG" last />
+        </View>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Estado inicial */}
+        {/* ---------------------------------------------------------------- */}
+        <Text style={styles.sectionLabel}>ESTADO INICIAL</Text>
+        <View style={styles.card}>
+          <Text style={styles.fieldLabel}>Seleciona o estado actual do ATM</Text>
+          <View style={styles.statusRow}>
+            {(
+              [
+                { key: 'has',     label: 'Tem dinheiro', icon: 'checkmark-circle', color: Colors.cashGreen },
+                { key: 'no',      label: 'Sem dinheiro', icon: 'close-circle',     color: '#D73A3A' },
+                { key: 'offline', label: 'Offline',      icon: 'power',            color: '#9CA3AF' },
+              ] as const
+            ).map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.statusOption, initialStatus === opt.key && { borderColor: opt.color, backgroundColor: opt.color + '15' }]}
+                onPress={() => setInitialStatus(opt.key)}
+              >
+                <Ionicons name={opt.icon as any} size={22} color={initialStatus === opt.key ? opt.color : Colors.textMuted} />
+                <Text style={[styles.statusOptionText, initialStatus === opt.key && { color: opt.color, fontWeight: '700' }]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* ---------------------------------------------------------------- */}
@@ -471,5 +508,26 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'center',
     lineHeight: FontSize.xs * 1.6,
+  },
+
+  // Initial status picker
+  statusRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  statusOption: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
+  statusOptionText: {
+    fontSize: FontSize.xs,
+    color: Colors.textMuted,
+    textAlign: 'center',
   },
 });

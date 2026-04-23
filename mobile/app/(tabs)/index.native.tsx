@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Radius, Spacing, atmMarkerColor } from '../../src/constants/theme';
 import { KudiPin, ATMMapPin } from '../../src/components/KudiLocLogo';
 import { getNearbyATMs, searchATMs } from '../../src/api/atm';
-import { getLocalAtms } from '../../src/store/localAtms';
+import { getLocalAtms, subscribeToStatusChanges } from '../../src/store/localAtms';
 import { useLocation } from '../../src/hooks/useLocation';
 import { StatusLight } from '../../src/components/StatusLight';
 import LoadingScreen from '../../src/components/LoadingScreen';
@@ -177,24 +177,37 @@ export default function MapScreen() {
     duration = 900,
   ) => {
     if (!cameraRef.current) return;
-    if (mode === 'none') {
-      cameraRef.current.setCamera({
-        centerCoordinate: center,
-        zoomLevel: zoom,
-        animationMode: 'none',
-        animationDuration: 0,
-      });
-    } else {
-      // flyTo handles center movement; zoomTo handles zoom change — both animated
-      cameraRef.current.flyTo(center, duration);
-      cameraRef.current.zoomTo(zoom, duration);
-    }
+    cameraRef.current.setCamera({
+      centerCoordinate: center,
+      zoomLevel: zoom,
+      animationMode: mode === 'none' ? 'none' : 'flyTo',
+      animationDuration: mode === 'none' ? 0 : duration,
+    });
   }, []);
 
   // Refresh map pins when returning from add-atm or ATM detail (after delete)
   useFocusEffect(useCallback(() => {
     fetchNearby();
   }, [fetchNearby]));
+
+  // Instant pin color update when a status report is submitted from the detail screen
+  useEffect(() => {
+    return subscribeToStatusChanges((id, cash) => {
+      setAtms((prev) => prev.map((a) => {
+        if (a.id !== id) return a;
+        return {
+          ...a,
+          status: {
+            ...a.status,
+            hasCash: cash === 'has',
+            hasMoney: cash === 'has',
+            operationalStatus: cash === 'offline' ? 'Offline' : 'Operational',
+            lastVerified: new Date().toISOString(),
+          },
+        };
+      }));
+    });
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Unified search: geocoding + ATM API in parallel, debounced 400ms

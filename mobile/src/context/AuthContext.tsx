@@ -30,6 +30,8 @@ interface AuthState {
   onLoginSuccess: (auth: AuthResponse) => void;
   loginAsDemo: (name?: string) => void;
   logout: () => Promise<void>;
+  /** Update the in-memory user object (e.g. after a name change). */
+  updateUser: (patch: Partial<UserDto>) => void;
 }
 
 const DEMO_USER: UserDto = {
@@ -111,6 +113,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser({ ...DEMO_USER, name: displayName });
   }, []);
 
+  const updateUser = useCallback((patch: Partial<UserDto>) => {
+    setUser((prev) => prev ? { ...prev, ...patch } : prev);
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await apiLogout();
@@ -130,8 +136,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onLoginSuccess,
       loginAsDemo,
       logout,
+      updateUser,
     }),
-    [loading, user, authInfo, onLoginSuccess, logout],
+    [loading, user, authInfo, onLoginSuccess, logout, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -81,17 +81,20 @@ public class StatusReportService : IStatusReportService
                 throw new ArgumentException("Utilizador não encontrado", nameof(dto.UserId));
             }
 
-            // Check per-user per-ATM report cooldown
-            var cooldown = TimeSpan.FromMinutes(_settings.CooldownMinutes);
-            var lastReport = await _reportRepository.GetLastReportByUserForATM(dto.UserId, dto.ATMId);
-            if (lastReport != null)
+            // Admins bypass the cooldown so they can correct status freely
+            if (!string.Equals(user.Role, "Admin", StringComparison.OrdinalIgnoreCase))
             {
-                var timeSinceLastReport = DateTime.UtcNow - lastReport.ReportedAt;
-                if (timeSinceLastReport < cooldown)
+                var cooldown = TimeSpan.FromMinutes(_settings.CooldownMinutes);
+                var lastReport = await _reportRepository.GetLastReportByUserForATM(dto.UserId, dto.ATMId);
+                if (lastReport != null)
                 {
-                    var remainingSeconds = (int)(cooldown - timeSinceLastReport).TotalSeconds;
-                    throw new InvalidOperationException(
-                        $"Aguarde {remainingSeconds} segundos antes de submeter outro relatório para este ATM.");
+                    var timeSinceLastReport = DateTime.UtcNow - lastReport.ReportedAt;
+                    if (timeSinceLastReport < cooldown)
+                    {
+                        var remainingSeconds = (int)(cooldown - timeSinceLastReport).TotalSeconds;
+                        throw new InvalidOperationException(
+                            $"Aguarde {remainingSeconds} segundos antes de submeter outro relatório para este ATM.");
+                    }
                 }
             }
         }

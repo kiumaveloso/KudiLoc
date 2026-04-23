@@ -23,6 +23,9 @@ public interface IATMService
     Task<FlatATMDto?> GetFlatATMByIdAsync(string id);
     Task<FlatATMDto?> PatchATMAsync(string id, UpdateATMDto dto);
     Task<PagedResultDto<FlatATMDto>> GetAllATMsFlatPagedAsync(int skip, int limit);
+
+    /// <summary>Admin-only: directly set ATM status, bypassing crowdsource cooldowns.</summary>
+    Task<ATMDto?> AdminSetStatusAsync(string id, bool hasCash, string operationalStatus);
 }
 
 public class ATMService : IATMService
@@ -257,6 +260,29 @@ public class ATMService : IATMService
             (int)totalCount,
             (int)Math.Ceiling(totalCount / (double)limit)
         );
+    }
+
+    public async Task<ATMDto?> AdminSetStatusAsync(string id, bool hasCash, string operationalStatus)
+    {
+        var atm = await _atmRepository.GetByIdAsync(id);
+        if (atm == null) return null;
+
+        atm.CurrentStatus.HasCash = hasCash;
+        atm.CurrentStatus.OperationalStatus = Enum.TryParse<OperationalStatus>(operationalStatus, true, out var parsed)
+            ? parsed
+            : OperationalStatus.Operational;
+        atm.CurrentStatus.LastVerified = DateTime.UtcNow;
+        atm.IsOnline = atm.CurrentStatus.OperationalStatus switch
+        {
+            OperationalStatus.Offline => "offline",
+            OperationalStatus.Maintenance => "maintenance",
+            _ => "online"
+        };
+        atm.UpdatedAt = DateTime.UtcNow;
+
+        var updated = await _atmRepository.UpdateAsync(atm);
+        await InvalidateAtmCachesAsync(updated.Id, updated.Province);
+        return MapToDto(updated);
     }
 
     // --- Cache invalidation ---

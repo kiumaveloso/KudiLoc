@@ -156,6 +156,12 @@ public class AuthController : ControllerBase
             try
             {
                 result = await _authService.LoginAsync(dto.PhoneNumber);
+                // Update name if the user provided one during login
+                if (!string.IsNullOrWhiteSpace(dto.Name))
+                {
+                    await _userService.UpdateUserAsync(result.UserId, new Application.DTOs.UpdateUserDto(dto.Name));
+                    result = result with { Name = dto.Name };
+                }
             }
             catch (UnauthorizedAccessException)
             {

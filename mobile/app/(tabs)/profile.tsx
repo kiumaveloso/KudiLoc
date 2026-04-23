@@ -2,7 +2,7 @@
 // Profile & Definições — dark green card, gamification levels, photo upload
 // ---------------------------------------------------------------------------
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,10 @@ import {
   Alert,
   Platform,
   Image,
+  Modal,
+  TextInput,
+  Pressable,
+  KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as SecureStore from 'expo-secure-store';
@@ -27,6 +31,7 @@ import {
   LEVELS,
 } from '../../src/constants/theme';
 import { useAuth } from '../../src/context/AuthContext';
+import { updateUserName } from '../../src/api/user';
 import LoadingScreen from '../../src/components/LoadingScreen';
 
 const AVATAR_KEY = 'kudiloc_avatar_uri';
@@ -34,8 +39,12 @@ const AVATAR_KEY = 'kudiloc_avatar_uri';
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { loading, user, isAuthenticated, logout } = useAuth();
+  const { loading, user, isAuthenticated, logout, updateUser } = useAuth();
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [editNameVisible, setEditNameVisible] = useState(false);
+  const [editNameValue, setEditNameValue] = useState('');
+  const [editNameLoading, setEditNameLoading] = useState(false);
+  const editNameRef = useRef<TextInput>(null);
 
   // Load saved avatar on mount
   useEffect(() => {
@@ -105,7 +114,29 @@ export default function ProfileScreen() {
   const initial = (user.name ?? 'U').charAt(0).toUpperCase();
   const displayName = user.name ?? `Utilizador ${user.id.slice(-4)}`;
 
+  const handleEditName = () => {
+    setEditNameValue(user?.name ?? '');
+    setEditNameVisible(true);
+    setTimeout(() => editNameRef.current?.focus(), 200);
+  };
+
+  const handleSaveName = async () => {
+    const trimmed = editNameValue.trim();
+    if (!trimmed || !user) return;
+    setEditNameLoading(true);
+    try {
+      await updateUserName(user.id, trimmed);
+      updateUser({ name: trimmed });
+      setEditNameVisible(false);
+    } catch {
+      Alert.alert('Erro', 'Não foi possível actualizar o nome.');
+    } finally {
+      setEditNameLoading(false);
+    }
+  };
+
   return (
+    <>
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
@@ -136,7 +167,10 @@ export default function ProfileScreen() {
               </View>
             </TouchableOpacity>
             <View style={styles.nameCol}>
-              <Text style={styles.userName}>{displayName}</Text>
+              <TouchableOpacity style={styles.nameRow} onPress={handleEditName} activeOpacity={0.7}>
+                <Text style={styles.userName}>{displayName}</Text>
+                <Ionicons name="pencil" size={13} color="rgba(255,255,255,0.5)" />
+              </TouchableOpacity>
               {/* Level badge */}
               <View style={[styles.levelBadge, { borderColor: level.color + '80' }]}>
                 <Ionicons name={level.icon as any} size={12} color={level.color} />
@@ -226,6 +260,41 @@ export default function ProfileScreen() {
 
         <Text style={styles.poweredBy}>Powered by Kudivila</Text>
     </ScrollView>
+
+    {/* Edit name modal */}
+    <Modal visible={editNameVisible} transparent animationType="fade" onRequestClose={() => setEditNameVisible(false)}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Pressable style={styles.editNameBackdrop} onPress={() => setEditNameVisible(false)}>
+          <Pressable style={styles.editNameSheet}>
+            <Text style={styles.editNameTitle}>Alterar nome</Text>
+            <TextInput
+              ref={editNameRef}
+              style={styles.editNameInput}
+              value={editNameValue}
+              onChangeText={setEditNameValue}
+              placeholder="O teu nome"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="words"
+              returnKeyType="done"
+              onSubmitEditing={handleSaveName}
+            />
+            <View style={styles.editNameBtns}>
+              <TouchableOpacity style={styles.editNameCancel} onPress={() => setEditNameVisible(false)}>
+                <Text style={styles.editNameCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editNameSave, (!editNameValue.trim() || editNameLoading) && { opacity: 0.5 }]}
+                onPress={handleSaveName}
+                disabled={!editNameValue.trim() || editNameLoading}
+              >
+                <Text style={styles.editNameSaveText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+    </>
   );
 }
 
@@ -325,6 +394,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primaryDark,
   },
   nameCol: { flex: 1, gap: 6 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   userName: {
     fontSize: FontSize.xl,
     fontWeight: '700',
@@ -525,6 +595,64 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.textMuted,
     marginTop: Spacing.sm,
+  },
+
+  // Edit name modal
+  editNameBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: Spacing.xxl,
+  },
+  editNameSheet: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  editNameTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  editNameInput: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm + 4,
+    fontSize: FontSize.md,
+    color: Colors.text,
+  },
+  editNameBtns: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  editNameCancel: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  editNameCancelText: {
+    fontSize: FontSize.md,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  editNameSave: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+  },
+  editNameSaveText: {
+    fontSize: FontSize.md,
+    color: Colors.white,
+    fontWeight: '700',
   },
 
   // Not authenticated
