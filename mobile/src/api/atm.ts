@@ -72,10 +72,11 @@ export async function setATMStatus(
   id: string,
   hasCash: boolean,
   operationalStatus: 'Operational' | 'Offline' | 'Maintenance',
+  hasPaper?: boolean,
 ): Promise<ATMDto> {
   return apiFetch<ATMDto>(`/atm/${id}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ has_cash: hasCash, operational_status: operationalStatus }),
+    body: JSON.stringify({ has_cash: hasCash, operational_status: operationalStatus, has_paper: hasPaper }),
   });
 }
 

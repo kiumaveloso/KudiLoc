@@ -2,7 +2,7 @@ using ATMLocator.Core.Entities;
 
 namespace ATMLocator.Application.DTOs;
 
-public record AdminSetStatusDto(bool HasCash, string? OperationalStatus = "Operational");
+public record AdminSetStatusDto(bool HasCash, string? OperationalStatus = "Operational", bool? HasPaper = null);
 
 public record UpdateATMDto(
     string? Name,

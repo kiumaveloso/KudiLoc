@@ -365,7 +365,7 @@ public class ATMController : ControllerBase
     {
         try
         {
-            var atm = await _atmService.AdminSetStatusAsync(id, dto.HasCash, dto.OperationalStatus ?? "Operational");
+            var atm = await _atmService.AdminSetStatusAsync(id, dto.HasCash, dto.OperationalStatus ?? "Operational", dto.HasPaper);
             if (atm == null)
                 return NotFound(new { statusCode = 404, message = "Caixa automático não encontrado" });
             return Ok(atm);

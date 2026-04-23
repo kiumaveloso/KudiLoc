@@ -164,16 +164,19 @@ export default function ATMDetailScreen() {
     setReportVisible(true);
   };
 
-  const applyReportToLocalState = (cash: 'has' | 'no' | 'offline') => {
+  const applyReportToLocalState = (cash: 'has' | 'no' | 'offline', paper?: boolean | null) => {
     setAtm((prev) => {
       if (!prev) return prev;
+      const isOffline = cash === 'offline';
       return {
         ...prev,
+        hasPaper: paper != null ? paper : isOffline ? false : prev.hasPaper,
         status: {
           ...prev.status,
           hasCash: cash === 'has',
           hasMoney: cash === 'has',
-          operationalStatus: cash === 'offline' ? 'Offline' : 'Operational',
+          hasPaper: paper != null ? paper : isOffline ? false : prev.status.hasPaper,
+          operationalStatus: isOffline ? 'Offline' : 'Operational',
           lastVerified: new Date().toISOString(),
         },
       };
@@ -187,7 +190,7 @@ export default function ATMDetailScreen() {
     try {
       if (!user || IS_DEMO(user.id)) {
         // Demo mode — update local state and the store (so map/list also reflect it)
-        applyReportToLocalState(cash);
+        applyReportToLocalState(cash, cash === 'offline' ? false : reportPaper);
         if (id) updateLocalAtmStatus(id, cash);
         setReportSuccess(true);
         setTimeout(() => { setReportVisible(false); }, 2000);
@@ -199,6 +202,7 @@ export default function ATMDetailScreen() {
           id,
           cash === 'has',
           cash === 'offline' ? 'Offline' : 'Operational',
+          cash === 'offline' ? false : (reportPaper ?? undefined),
         );
       } else {
         const report: CreateStatusReport = {
@@ -210,7 +214,8 @@ export default function ATMDetailScreen() {
         };
         await submitStatusReport(report);
       }
-      applyReportToLocalState(cash);
+      const paperValue = cash === 'offline' ? false : (reportPaper ?? null);
+      applyReportToLocalState(cash, paperValue);
       if (id) updateLocalAtmStatus(id, cash);
       setReportSuccess(true);
       setTimeout(() => { setReportVisible(false); }, 2000);
@@ -381,13 +386,13 @@ export default function ATMDetailScreen() {
             </View>
 
             {/* PAPEL */}
-            <View style={[styles.infoCard, { backgroundColor: atm.status.hasPaper ? '#F0FDF4' : Colors.borderLight }]}>
+            <View style={[styles.infoCard, { backgroundColor: isOffline ? Colors.borderLight : atm.status.hasPaper ? '#F0FDF4' : Colors.borderLight }]}>
               <View style={styles.infoCardHeader}>
                 <Ionicons name="receipt-outline" size={13} color={Colors.textMuted} />
                 <Text style={styles.infoCardLabel}>PAPEL</Text>
               </View>
-              <Text style={[styles.infoCardValue, { color: atm.status.hasPaper ? Colors.cashGreen : Colors.textMuted }]}>
-                {atm.status.hasPaper ? 'Tem papel' : 'Sem papel'}
+              <Text style={[styles.infoCardValue, { color: isOffline ? Colors.textMuted : atm.status.hasPaper ? Colors.cashGreen : Colors.textMuted }]}>
+                {isOffline ? 'Indisponível' : atm.status.hasPaper ? 'Tem papel' : 'Sem papel'}
               </Text>
             </View>
 
