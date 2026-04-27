@@ -2,7 +2,7 @@
 
 **A crowd-sourced ATM cash availability platform for Angola**
 
-> Solving Angola's ATM cash availability crisis through community-driven reporting and intelligent crowd-sourcing.
+> Solving Angola's ATM cash availability crisis through community-driven reporting and real-time data.
 
 ---
 
@@ -16,18 +16,20 @@
 - [Getting Started](#getting-started)
 - [API Reference](#api-reference)
 - [Crowd-Sourcing Algorithm](#crowd-sourcing-algorithm)
-- [Frontend](#frontend)
 - [Deployment](#deployment)
 - [Testing](#testing)
-- [Contributing](#contributing)
 
 ---
 
 ## Overview
 
-KudiLoc is a full-stack platform with a **.NET C# REST API** backend and a **React web frontend**. Users can find ATMs with available cash, report ATM status in real-time, and help the community avoid wasted trips.
+KudiLoc is a full-stack platform with three components:
 
-The system uses a reputation-weighted crowd-sourcing algorithm to determine ATM reliability and cash availability.
+- **.NET 8 REST API** — Clean Architecture backend with MongoDB Atlas
+- **React Native mobile app** — iOS & Android (Expo + Mapbox)
+- **React web frontend** — browser-based map view
+
+Users find nearby ATMs with available cash, submit crowd-sourced status reports in real time, and help the community avoid wasted trips. The system uses a reputation-weighted algorithm to determine ATM reliability.
 
 ---
 
@@ -56,7 +58,7 @@ Clean Architecture with four layers:
 ├─────────────────────────────────────────┤
 │       Core Layer (Domain Entities)      │  ← Entities, interfaces, rules
 ├─────────────────────────────────────────┤
-│   Infrastructure Layer (Data Access)    │  ← MongoDB repositories
+│   Infrastructure Layer (Data Access)    │  ← MongoDB + Redis repositories
 └─────────────────────────────────────────┘
 ```
 
@@ -65,54 +67,67 @@ Clean Architecture with four layers:
 ## Technology Stack
 
 | Component | Technology |
-|-----------|-----------|
+|---|---|
 | Backend | .NET 8, C# |
 | Database | MongoDB Atlas |
-| Authentication | JWT Bearer |
+| Cache | Redis (Upstash) |
+| Authentication | JWT + OTP via SMS (Africa's Talking) |
+| Phone encryption | AES-256-CBC + HMAC-SHA256 |
 | Validation | FluentValidation |
 | API Docs | Swagger / OpenAPI |
-| Frontend | React 18, Vite, Tailwind CSS |
-| Map | React Leaflet (OpenStreetMap) |
+| Media | Cloudinary |
+| Mobile app | React Native, Expo, Expo Router |
+| Mobile map | Mapbox (rnmapbox/maps) |
+| Web frontend | React 18, Vite, Tailwind CSS |
 | Deployment | Render (Docker) |
+| Mobile builds | EAS Build (Expo Application Services) |
 
 ---
 
 ## Project Structure
 
 ```
-KudivilaATMLocator/
-├── ATMLocator.API/                  # Web API — controllers, middleware, startup
-│   ├── Controllers/
-│   │   ├── ATMController.cs         # ATM CRUD + nearby search
-│   │   ├── ReportController.cs      # /api/reports (frontend-compatible)
-│   │   ├── StatusReportController.cs
-│   │   ├── AuthController.cs
-│   │   ├── UserController.cs
-│   │   └── AnalyticsController.cs
-│   ├── Middleware/
-│   │   ├── ApiKeyMiddleware.cs
-│   │   ├── ErrorHandlingMiddleware.cs
-│   │   ├── RequestLoggingMiddleware.cs
-│   │   ├── SecurityHeadersMiddleware.cs
-│   │   └── CorrelationIdMiddleware.cs
-│   └── Program.cs
+KudiLoc/
+├── KudivilaATMLocator/              # Backend (.NET 8)
+│   ├── ATMLocator.API/              # Controllers, middleware, Program.cs
+│   │   ├── Controllers/
+│   │   │   ├── ATMController.cs     # ATM CRUD, nearby search, admin status
+│   │   │   ├── AuthController.cs    # OTP request/verify, refresh, logout
+│   │   │   ├── UserController.cs    # Profile management
+│   │   │   ├── StatusReportController.cs
+│   │   │   ├── CommentController.cs
+│   │   │   └── AnalyticsController.cs
+│   │   └── Middleware/
+│   │       ├── ApiKeyMiddleware.cs
+│   │       ├── ErrorHandlingMiddleware.cs
+│   │       ├── SecurityHeadersMiddleware.cs
+│   │       └── CorrelationIdMiddleware.cs
+│   ├── ATMLocator.Application/      # Services, DTOs, validators
+│   ├── ATMLocator.Core/             # Domain entities, interfaces, settings
+│   ├── ATMLocator.Infrastructure/   # MongoDB + Redis repositories
+│   ├── ATMLocator.Tests/            # Unit + integration tests
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── render.yaml
 │
-├── ATMLocator.Application/          # Business logic — services, DTOs, validators
-├── ATMLocator.Core/                 # Domain — entities, interfaces, settings
-├── ATMLocator.Infrastructure/       # Data access — MongoDB repositories
-├── ATMLocator.Tests/                # Unit + integration tests
+├── mobile/                          # React Native app (Expo)
+│   ├── app/
+│   │   ├── (tabs)/                  # Map, list, leaderboard, profile
+│   │   ├── atm/[id]/                # ATM detail + report screen
+│   │   ├── admin/                   # Admin panel (add ATM)
+│   │   ├── legal/                   # Privacy policy, terms, support
+│   │   ├── login.tsx
+│   │   └── onboarding.tsx
+│   ├── src/
+│   │   ├── api/                     # API client (atm, user, auth)
+│   │   ├── context/                 # AuthContext
+│   │   ├── store/                   # localAtms (pub-sub status store)
+│   │   └── types/                   # Shared TypeScript types
+│   ├── app.json
+│   └── eas.json
 │
 ├── frontend/                        # React web app
-│   ├── src/
-│   │   ├── api/base44Client.js      # Custom API client → KudiLoc C# API
-│   │   ├── pages/                   # Home, ATMDetail, ReportATM, Profile
-│   │   └── components/              # Map, ATM markers, bottom sheets
-│   └── package.json
-│
-├── Dockerfile
-├── docker-compose.yml
-├── render.yaml
-└── KudiLoc.sln
+└── docs/                            # GitHub Pages (privacy policy)
 ```
 
 ---
@@ -122,58 +137,68 @@ KudivilaATMLocator/
 ### Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [MongoDB](https://www.mongodb.com/try/download/community) or a [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) connection string
-- [Node.js 18+](https://nodejs.org/) (for the frontend)
+- [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) connection string
+- [Node.js 18+](https://nodejs.org/)
+- [Expo CLI](https://docs.expo.dev/get-started/installation/) (for the mobile app)
 
 ### 1. Clone
 
 ```bash
 git clone https://github.com/kiumaveloso/KudiLoc.git
-cd KudiLoc/KudivilaATMLocator
 ```
 
-### 2. Configure the API
-
-Edit `ATMLocator.API/appsettings.json`:
-
-```json
-{
-  "MongoDbSettings": {
-    "ConnectionString": "mongodb://localhost:27017",
-    "DatabaseName": "KudiLoc"
-  },
-  "Jwt": {
-    "Key": "YourSecretKeyAtLeast32CharactersLong!",
-    "Issuer": "KudiLoc",
-    "Audience": "KudiLoc",
-    "ExpirationDays": 30
-  }
-}
-```
-
-### 3. Run the API
+### 2. Run the API
 
 ```bash
-cd ATMLocator.API
+cd KudiLoc/KudivilaATMLocator/ATMLocator.API
 dotnet run
 ```
 
-- API: `http://localhost:5000`
-- Swagger: `http://localhost:5000/swagger`
+- API: `http://localhost:5054`
+- Swagger: `http://localhost:5054/swagger`
 
-### 4. Run the Frontend
+Required environment variables (see `appsettings.json`):
+
+| Variable | Description |
+|---|---|
+| `MONGO_URI` | MongoDB Atlas connection string |
+| `Jwt__Key` | JWT signing secret (32+ chars) |
+| `Encryption__Key` | AES-256 key (base64, 32 bytes) |
+| `Encryption__HmacKey` | HMAC key (base64, 32+ bytes) |
+| `AfricasTalking__ApiKey` | SMS OTP provider |
+| `AfricasTalking__Username` | Africa's Talking username |
+| `Cloudinary__CloudName` | Photo uploads |
+| `Cloudinary__ApiKey` | Cloudinary API key |
+| `Cloudinary__ApiSecret` | Cloudinary API secret |
+
+### 3. Run the Mobile App
 
 ```bash
-cd frontend
+cd KudiLoc/mobile
 npm install
-VITE_API_URL=http://localhost:5000 npm run dev
+npx expo start
 ```
 
-- Frontend: `http://localhost:5173`
+Scan the QR code with the Expo Go app, or run on a simulator.
 
-### 5. Docker (optional)
+For a production build (iOS):
 
 ```bash
+eas build --platform ios --profile production
+```
+
+### 4. Run the Web Frontend
+
+```bash
+cd KudiLoc/frontend
+npm install
+VITE_API_URL=http://localhost:5054 npm run dev
+```
+
+### 5. Docker
+
+```bash
+cd KudiLoc/KudivilaATMLocator
 docker-compose up
 ```
 
@@ -181,100 +206,64 @@ docker-compose up
 
 ## API Reference
 
-All responses use **snake_case** field names. No authentication required for browsing ATMs or submitting reports.
+All responses use **snake_case** field names. Production base URL: `https://kudiloc-api.onrender.com/api`
 
-### Authentication
+### Authentication (OTP)
 
 ```http
-POST /api/auth/register      # Register with phone number
-POST /api/auth/login         # Login, returns JWT
-POST /api/auth/otp/request   # Request OTP code
-POST /api/auth/otp/verify    # Verify OTP, returns JWT
-GET  /api/auth/me            # Current user profile (requires JWT)
+POST /api/auth/otp/request   # Send OTP SMS to phone number
+POST /api/auth/otp/verify    # Verify OTP → returns JWT + sets httpOnly refresh cookie
+POST /api/auth/refresh        # Refresh access token (uses cookie)
+POST /api/auth/logout         # Revoke refresh token
+GET  /api/auth/me             # Current user profile (requires JWT)
 ```
 
 ### ATMs
 
 ```http
-# List / filter (no auth required)
-GET  /api/atm                                     # All ATMs, sorted by updated_date
-GET  /api/atm?id={id}                             # Filter by ID (returns array)
-GET  /api/atm?sort=-updated_date&limit=200
-
-# Geospatial search
-GET  /api/atm/nearby?latitude={lat}&longitude={lon}&radiusKm={km}
-POST /api/atm/nearby/auto                         # Body: { latitude, longitude, radiusKm }
-POST /api/atm/nearby/auto/sorted                  # Sorted by walking distance
-
-# Lookup
-GET  /api/atm/{id}
-GET  /api/atm/search?query={term}
-GET  /api/atm/province/{province}
-GET  /api/atm/bank/{bankName}
-
-# Write (no auth required)
-POST   /api/atm                                   # Create ATM
-PATCH  /api/atm/{id}                              # Partial update (status, connectivity…)
-PUT    /api/atm/{id}                              # Full update
-DELETE /api/atm/{id}                              # Delete
-
-# Media
-POST /api/atm/{id}/photo                          # Upload photo (requires JWT)
+GET  /api/atm                          # All ATMs (paginated)
+GET  /api/atm/{id}                     # Single ATM
+GET  /api/atm/search?query={term}      # Text search
+GET  /api/atm/province/{province}      # Filter by province
+GET  /api/atm/bank/{bankName}          # Filter by bank
+POST /api/atm/nearby/auto/sorted       # Nearby ATMs sorted by distance
+PATCH /api/atm/{id}                    # Partial update
+POST  /api/atm                         # Create ATM (Admin only)
+DELETE /api/atm/{id}                   # Delete ATM (Admin only)
+PATCH /api/atm/{id}/status             # Admin: set cash/operational status directly
+POST  /api/atm/{id}/photo              # Upload photo (requires JWT)
 ```
 
-**ATM response format:**
-```json
-{
-  "id": "abc123",
-  "bank_name": "Banco BAI",
-  "location_name": "Talatona Shopping, piso 0",
-  "latitude": -8.9470,
-  "longitude": 13.1844,
-  "status": "has_money",
-  "is_online": "online",
-  "has_paper": true,
-  "reliability_score": 87,
-  "recent_reports_count": 4,
-  "last_report_time": "2026-03-11T10:30:00Z",
-  "updated_date": "2026-03-11T10:30:00Z"
-}
-```
-
-### Reports
+### Status Reports
 
 ```http
-POST /api/reports                                 # Submit report (no auth required)
-GET  /api/reports?atm_id={id}&limit=20            # Reports for an ATM
-GET  /api/reports?created_by={email}&limit=100    # Reports by a user
-GET  /api/statusreport/atm/{atmId}                # Paginated report history
+POST /api/statusreport                 # Submit crowd-sourced report
+GET  /api/statusreport/atm/{atmId}     # Report history for an ATM
 ```
 
-**Submit report:**
-```json
-{
-  "atm_id": "abc123",
-  "status_reported": "has_money",
-  "reporter_reputation": 50
-}
+### Comments
+
+```http
+GET  /api/comment/atm/{atmId}          # Get comments for an ATM
+POST /api/comment                      # Post a comment
+POST /api/comment/{id}/helpful         # Mark comment as helpful
 ```
 
 ### Users & Analytics
 
 ```http
-GET    /api/user/{id}                 # Requires JWT
-PUT    /api/user/{id}                 # Update profile
-DELETE /api/user/{id}                 # Delete account
-GET    /api/analytics/stats           # System-wide statistics
-GET    /api/analytics/atm/{id}/activity
+GET    /api/user/{id}                  # Requires JWT
+PUT    /api/user/{id}                  # Update profile
+DELETE /api/user/{id}                  # Delete account
+GET    /api/analytics/stats            # System-wide statistics
 ```
 
 ### System
 
 ```http
-GET /health       # Instant health check (always 200)
-GET /health/db    # MongoDB connectivity check
-GET /             # API version and status
-GET /swagger      # Interactive API documentation
+GET /health        # Instant health check (always 200)
+GET /health/db     # MongoDB connectivity check
+GET /swagger       # Interactive API documentation
 ```
 
 ---
@@ -287,69 +276,48 @@ Reports from the last **30 minutes** are collected per ATM. Each report is weigh
 weight = 0.5 + (reputation / 100)
 ```
 
-The side (has money / no money) with the higher total weight wins. A reliability score (0–100) is then calculated:
+The side (has cash / no cash) with the higher total weight wins. A reliability score (0–100) is calculated:
 
 | Component | Max Points | Description |
-|-----------|-----------|-------------|
+|---|---|---|
 | Volume bonus | 50 | More reports = higher confidence |
 | Consensus bonus | 30 | How unanimous the reports are |
 | Trust bonus | 20 | Winning side's total reputation weight |
 
-After each report cycle, accurate reporters gain **+2 reputation**; reporters who contradict consensus lose **-3 reputation**.
+Accurate reporters gain **+2 reputation**; reporters who contradict consensus lose **-3 reputation**.
+
+Admin users can bypass crowd-source logic and set ATM status directly via `PATCH /api/atm/{id}/status`.
 
 ---
 
-## Frontend
+## Security
 
-The React frontend lives at `KudivilaATMLocator/frontend/`.
-
-**Features:**
-- Interactive map with real-time ATM markers (Leaflet + OpenStreetMap)
-- Report cash status, connectivity, and paper availability directly from the map
-- ATM detail page with reliability ring, report history, and Google Maps navigation
-- Add new ATMs using GPS coordinates
-- Favorites stored locally in the browser
-
-**To build for production:**
-```bash
-cd KudivilaATMLocator/frontend
-npm install
-VITE_API_URL=https://kudiloc-api.onrender.com npm run build
-```
-
-The `VITE_API_URL` environment variable tells the frontend which API to connect to.
+- JWT stored in memory only (never localStorage)
+- httpOnly refresh token cookie (SameSite=None, Secure, 30-day TTL)
+- Phone numbers encrypted at rest (AES-256-CBC) with HMAC-SHA256 hash for lookups
+- Login audit trail with 90-day TTL
+- Brute-force protection: 5 failed OTP attempts in 15 min → 429
+- CSP + HSTS headers
+- IP rate limiting via AspNetCoreRateLimit
 
 ---
 
 ## Deployment
 
-The project is configured for **Render** using `render.yaml`. Every push to `main` triggers an automatic redeploy.
+The API is deployed on **Render** via Docker. Every push to `main` triggers an automatic redeploy.
 
-### Steps
+Key environment variables to set in the Render dashboard:
 
-1. Connect the `kiumaveloso/KudiLoc` GitHub repo to [Render](https://render.com)
-2. Render reads `render.yaml` and configures the service automatically
-3. Set one environment variable manually in the Render dashboard:
-   - `MongoDbSettings__ConnectionString` — your MongoDB Atlas URI
-
-### Environment Variables
-
-| Variable | Description | Source |
-|----------|-------------|--------|
-| `MongoDbSettings__ConnectionString` | MongoDB Atlas URI | Set manually |
-| `MongoDbSettings__DatabaseName` | Database name | `render.yaml` (`KudiLoc`) |
-| `Jwt__Key` | JWT signing key | Auto-generated by Render |
-| `ASPNETCORE_ENVIRONMENT` | Runtime environment | `render.yaml` (`Production`) |
-| `ApiKey` | Optional endpoint protection key | Set manually if needed |
-
-### Docker
-
-```bash
-cd KudivilaATMLocator
-docker build -t kudiloc-api .
-docker run -p 5000:8080 \
-  -e MongoDbSettings__ConnectionString="your-atlas-uri" \
-  kudiloc-api
+```
+MONGO_URI
+Jwt__Key
+Encryption__Key
+Encryption__HmacKey
+AfricasTalking__ApiKey
+AfricasTalking__Username
+Cloudinary__CloudName
+Cloudinary__ApiKey
+Cloudinary__ApiSecret
 ```
 
 ---
@@ -361,22 +329,12 @@ cd KudivilaATMLocator
 dotnet test
 ```
 
-| Suite | Tests | What it covers |
-|-------|-------|----------------|
-| ATM Service | 9 | CRUD, search, geospatial |
-| Status Report Service | 5 | Crowd-sourcing, cooldowns, reputation |
-| User Service | 5 | Registration, retrieval, updates |
-| Auth Service | 4 | JWT generation, login, register |
-| Integration | 15 | Full HTTP request/response cycle |
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a branch: `git checkout -b feature/your-feature`
-3. Commit your changes
-4. Open a Pull Request
+| Suite | What it covers |
+|---|---|
+| ATM Service | CRUD, search, geospatial |
+| Status Report Service | Crowd-sourcing, cooldowns, reputation |
+| User Service | Registration, retrieval, updates |
+| Integration | Full HTTP request/response cycle |
 
 ---
 
