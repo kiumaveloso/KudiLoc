@@ -98,9 +98,9 @@ Fill in these fields in the "App Review Information" section of App Store Connec
 
 | Field | Value |
 |---|---|
-| **First Name** | *(your first name)* |
-| **Last Name** | *(your last name)* |
-| **Phone** | *(your phone number with country code)* |
+| **First Name** | Kiuma |
+| **Last Name** | Veloso |
+| **Phone** | +244 929 096 652 |
 | **Email** | admin@kudiloc.com |
 
 ### Demo Account (required — the app requires login)
